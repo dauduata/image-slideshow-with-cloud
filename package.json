@@ -1,0 +1,14 @@
+{
+  "name": "image-link-drive-gen",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Extract public image links from a Google Drive folder",
+  "scripts": {
+    "extract": "node extract-drive-images.js",
+    "extract:onedrive": "node extract-onedrive-images.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "playwright": "1.55.1"
+  }
+}
