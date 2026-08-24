@@ -4,23 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Image Gallery</title>
-  <link rel="stylesheet" href="https://unpkg.com/flickity@2/dist/flickity.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main>
     <header>
-      <h1>Image index</h1>
+      <h1>Bé Đào xuất giá</h1>
       <div class="meta" id="meta">Loading</div>
     </header>
     <section class="gallery-shell" aria-label="Image gallery">
-      <div class="gallery" id="gallery"></div>
+      <div class="gallery swiper" id="gallery">
+        <div class="swiper-wrapper"></div>
+        <div class="swiper-pagination"></div>
+        <button class="swiper-button-prev" type="button" aria-label="Ảnh trước"></button>
+        <button class="swiper-button-next" type="button" aria-label="Ảnh tiếp theo"></button>
+      </div>
     </section>
     <p id="status" role="status">Loading images...</p>
   </main>
-  <script src="https://unpkg.com/flickity@2/dist/flickity.pkgd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script src="google-config.js"></script>
-  <script src="sna-xmas-2019.js"></script>
+  <script src="image-links.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

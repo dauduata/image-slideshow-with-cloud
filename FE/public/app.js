@@ -1,5 +1,6 @@
 const dataFile = new URLSearchParams(window.location.search).get('data') || 'image-links.js';
 const gallery = document.querySelector('#gallery');
+const galleryWrapper = gallery.querySelector('.swiper-wrapper');
 const status = document.querySelector('#status');
 const meta = document.querySelector('#meta');
 
@@ -47,12 +48,14 @@ function showError(message) {
 
 function addImage(item, index, total) {
   const cell = document.createElement('article');
+  const zoomContainer = document.createElement('div');
   const image = document.createElement('img');
   const caption = document.createElement('div');
   const name = document.createElement('span');
   const count = document.createElement('span');
 
-  cell.className = 'gallery-cell';
+  cell.className = 'swiper-slide gallery-cell';
+  zoomContainer.className = 'swiper-zoom-container';
   image.src = imageUrl(item);
   image.alt = item.name || `Image ${index + 1}`;
   image.loading = index === 0 ? 'eager' : 'lazy';
@@ -62,8 +65,9 @@ function addImage(item, index, total) {
   name.textContent = item.name || 'Untitled image';
   count.textContent = `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
   caption.append(name, count);
-  cell.append(image, caption);
-  gallery.appendChild(cell);
+  zoomContainer.appendChild(image);
+  cell.append(zoomContainer, caption);
+  galleryWrapper.appendChild(cell);
 }
 
 const driveConfig = window.GOOGLE_DRIVE_CONFIG || {};
@@ -76,7 +80,15 @@ source
     if (!Array.isArray(items) || items.length === 0) throw new Error('The JSON file contains no images');
     const images = items.filter((item) => item && imageUrl(item));
     images.forEach((item, index) => addImage(item, index, images.length));
-    new Flickity(gallery, { cellAlign: 'center', contain: true, wrapAround: true, lazyLoad: 2, pageDots: true });
+    new Swiper(gallery, {
+      loop: true,
+      grabCursor: true,
+      zoom: { maxRatio: 3, minRatio: 1 },
+      pagination: { el: '.swiper-pagination', clickable: true, dynamicBullets: true },
+      navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+      touchEventsTarget: 'container',
+      threshold: 15
+    });
     meta.textContent = `${images.length} images · ${dataFile}`;
     status.textContent = 'Ready';
   })
