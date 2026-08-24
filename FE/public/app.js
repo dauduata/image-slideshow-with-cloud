@@ -4,16 +4,16 @@ const galleryWrapper = gallery.querySelector('.swiper-wrapper');
 const status = document.querySelector('#status');
 const meta = document.querySelector('#meta');
 
-function imageUrl(item) {
+function imageUrl(item, width = 2400) {
   let sourceUrl;
   if (item.thumbnailLink) {
-    sourceUrl = item.thumbnailLink.replace(/=s\d+$/, '=w2400');
+    sourceUrl = item.thumbnailLink.replace(/=s\d+$/, `=w${width}`);
     return sourceUrl;
   }
   if (item.thumbnailUrl) {
-    sourceUrl = item.thumbnailUrl.replace(/([?&])width=\d+/, '$1width=2400').replace(/([?&])height=\d+/, '$1height=2400');
+    sourceUrl = item.thumbnailUrl.replace(/([?&])width=\d+/, `$1width=${width}`).replace(/([?&])height=\d+/, `$1height=${width}`);
   } else if (item.id && item.url?.includes('drive.google.com')) {
-    sourceUrl = `https://lh3.googleusercontent.com/d/${encodeURIComponent(item.id)}=w2400`;
+    sourceUrl = `https://lh3.googleusercontent.com/d/${encodeURIComponent(item.id)}=w${width}`;
   } else {
     sourceUrl = item.url;
   }
@@ -46,28 +46,33 @@ function showError(message) {
   status.style.color = '#ff9b8f';
 }
 
-function addImage(item, index, total) {
-  const cell = document.createElement('article');
-  const zoomContainer = document.createElement('div');
-  const image = document.createElement('img');
-  const caption = document.createElement('div');
-  const name = document.createElement('span');
-  const count = document.createElement('span');
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
 
-  cell.className = 'swiper-slide gallery-cell';
-  zoomContainer.className = 'swiper-zoom-container';
-  image.src = imageUrl(item);
-  image.alt = item.name || `Image ${index + 1}`;
-  image.loading = index === 0 ? 'eager' : 'lazy';
-  image.referrerPolicy = 'no-referrer';
-  image.onerror = () => image.classList.add('image-error');
-  caption.className = 'caption';
-  name.textContent = item.name || 'Untitled image';
-  count.textContent = `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
-  caption.append(name, count);
-  zoomContainer.appendChild(image);
-  cell.append(zoomContainer, caption);
-  galleryWrapper.appendChild(cell);
+function renderSlide(item, index, total) {
+  const name = escapeHtml(item.name || 'Untitled image');
+  const alt = escapeHtml(item.name || `Image ${index + 1}`);
+  const count = `${String(index + 1).padStart(4, '0')} / ${String(total).padStart(4, '0')}`;
+  return `<article class="swiper-slide gallery-cell">
+    <div class="swiper-zoom-container">
+      <img src="${escapeHtml(imageUrl(item))}" data-full-src="${escapeHtml(imageUrl(item))}" alt="${alt}" loading="lazy" referrerpolicy="no-referrer">
+    </div>
+    <div class="caption"><span>${name}</span><span>${count}</span></div>
+  </article>`;
+}
+
+function loadFullResolutionImage(swiper) {
+  const activeSlide = gallery.querySelector('.swiper-slide-active');
+  const image = activeSlide?.querySelector('img[data-full-src]');
+  if (image && image.src !== image.dataset.fullSrc) {
+    image.src = image.dataset.fullSrc;
+  }
 }
 
 const driveConfig = window.GOOGLE_DRIVE_CONFIG || {};
@@ -79,15 +84,34 @@ source
   .then((items) => {
     if (!Array.isArray(items) || items.length === 0) throw new Error('The JSON file contains no images');
     const images = items.filter((item) => item && imageUrl(item));
-    images.forEach((item, index) => addImage(item, index, images.length));
-    new Swiper(gallery, {
-      loop: true,
+    const swiper = new Swiper(gallery, {
+      virtual: {
+        slides: images,
+        addSlidesBefore: 3,
+        addSlidesAfter: 3,
+        renderSlide: (item, index) => renderSlide(item, index, images.length)
+      },
+      loop: false,
       grabCursor: true,
       zoom: { maxRatio: 3, minRatio: 1 },
-      pagination: { el: '.swiper-pagination', clickable: true, dynamicBullets: true },
+      pagination: { el: '.swiper-pagination', type: 'fraction' },
       navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
       touchEventsTarget: 'container',
-      threshold: 15
+      threshold: 15,
+      on: {
+        init: loadFullResolutionImage,
+        slideChange: loadFullResolutionImage,
+        touchEnd(swiperInstance) {
+          if (swiperInstance.isEnd && swiperInstance.swipeDirection === 'next') swiperInstance.slideTo(0);
+          if (swiperInstance.isBeginning && swiperInstance.swipeDirection === 'prev') swiperInstance.slideTo(images.length - 1);
+        }
+      }
+    });
+    gallery.querySelector('.swiper-button-next').addEventListener('click', () => {
+      if (swiper.isEnd) swiper.slideTo(0);
+    });
+    gallery.querySelector('.swiper-button-prev').addEventListener('click', () => {
+      if (swiper.isBeginning) swiper.slideTo(images.length - 1);
     });
     meta.textContent = `${images.length} images · ${dataFile}`;
     status.textContent = 'Ready';
