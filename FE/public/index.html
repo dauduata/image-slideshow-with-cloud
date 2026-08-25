@@ -11,7 +11,10 @@
   <main>
     <header>
       <h1>JL at Bao Loc - 2026</h1>
-      <div class="meta" id="meta">Loading</div>
+      <div class="header-tools">
+        <div class="meta" id="meta">Loading</div>
+        <button class="go-to-button" id="go-to-button" type="button" disabled>Go to</button>
+      </div>
     </header>
     <section class="gallery-shell" aria-label="Image gallery">
       <div class="gallery swiper" id="gallery">
@@ -23,6 +26,17 @@
     </section>
     <p id="status" role="status">Loading images...</p>
   </main>
+  <dialog id="go-to-dialog" aria-labelledby="go-to-title">
+    <form method="dialog" id="go-to-form">
+      <h2 id="go-to-title">Go to image</h2>
+      <label for="image-index">Image index</label>
+      <input id="image-index" name="imageIndex" type="number" min="1" required>
+      <div class="dialog-actions">
+        <button type="button" id="go-to-cancel">Cancel</button>
+        <button type="submit">Go to</button>
+      </div>
+    </form>
+  </dialog>
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script src="google-config.js"></script>
   <script src="image-onedrive-links.js"></script>

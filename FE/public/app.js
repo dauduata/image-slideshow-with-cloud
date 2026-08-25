@@ -3,6 +3,11 @@ const gallery = document.querySelector('#gallery');
 const galleryWrapper = gallery.querySelector('.swiper-wrapper');
 const status = document.querySelector('#status');
 const meta = document.querySelector('#meta');
+const goToButton = document.querySelector('#go-to-button');
+const goToDialog = document.querySelector('#go-to-dialog');
+const goToForm = document.querySelector('#go-to-form');
+const imageIndexInput = document.querySelector('#image-index');
+const goToCancel = document.querySelector('#go-to-cancel');
 
 function imageUrl(item, width = 2400) {
   let sourceUrl;
@@ -84,6 +89,14 @@ source
   .then((items) => {
     if (!Array.isArray(items) || items.length === 0) throw new Error('The JSON file contains no images');
     const images = items.filter((item) => item && imageUrl(item));
+    const storageKey = `image-gallery-index:${dataFile}`;
+    const savedIndex = Number.parseInt(localStorage.getItem(storageKey), 10);
+    const initialSlide = Number.isInteger(savedIndex)
+      ? Math.min(Math.max(savedIndex, 0), images.length - 1)
+      : 0;
+    const saveCurrentIndex = (swiperInstance) => {
+      localStorage.setItem(storageKey, String(swiperInstance.activeIndex));
+    };
     const swiper = new Swiper(gallery, {
       virtual: {
         slides: images,
@@ -92,6 +105,7 @@ source
         renderSlide: (item, index) => renderSlide(item, index, images.length)
       },
       loop: false,
+      initialSlide,
       grabCursor: true,
       zoom: { maxRatio: 3, minRatio: 1 },
       pagination: { el: '.swiper-pagination', type: 'fraction' },
@@ -99,14 +113,40 @@ source
       touchEventsTarget: 'container',
       threshold: 15,
       on: {
-        init: loadFullResolutionImage,
-        slideChange: loadFullResolutionImage,
+        init(swiperInstance) {
+          loadFullResolutionImage(swiperInstance);
+          saveCurrentIndex(swiperInstance);
+        },
+        slideChange(swiperInstance) {
+          loadFullResolutionImage(swiperInstance);
+          saveCurrentIndex(swiperInstance);
+        },
         touchEnd(swiperInstance) {
           if (swiperInstance.isEnd && swiperInstance.swipeDirection === 'next') swiperInstance.slideTo(0);
           if (swiperInstance.isBeginning && swiperInstance.swipeDirection === 'prev') swiperInstance.slideTo(images.length - 1);
         }
       }
     });
+    imageIndexInput.max = String(images.length);
+    goToButton.disabled = false;
+    goToButton.addEventListener('click', () => {
+      imageIndexInput.value = String(swiper.activeIndex + 1);
+      goToDialog.showModal();
+      imageIndexInput.select();
+    });
+    goToForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const requestedIndex = Number.parseInt(imageIndexInput.value, 10);
+      if (!Number.isInteger(requestedIndex) || requestedIndex < 1 || requestedIndex > images.length) {
+        imageIndexInput.setCustomValidity(`Enter an index from 1 to ${images.length}.`);
+        imageIndexInput.reportValidity();
+        return;
+      }
+      imageIndexInput.setCustomValidity('');
+      goToDialog.close();
+      swiper.slideTo(requestedIndex - 1);
+    });
+    goToCancel.addEventListener('click', () => goToDialog.close());
     gallery.querySelector('.swiper-button-next').addEventListener('click', () => {
       if (swiper.isEnd) swiper.slideTo(0);
     });
