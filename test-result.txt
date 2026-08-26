@@ -1,0 +1,177 @@
+minFaceSize 20 Faces: 6
+minFaceSize 25 Faces: 5
+
+DEBUG candidate score=0.786 box=633,424,30x17 landmarks=637,439|667,441|654,452|640,459|662,460
+DEBUG box score=0.786 x=633,y=424,w=30,h=17
+DEBUG candidate score=0.785 box=633,386,31x36 landmarks=640,439|669,440|658,452|642,461|664,460
+DEBUG box score=0.785 x=633,y=386,w=31,h=36
+DEBUG landmarks=639.7,390.9 | 668.9,392.0 | 657.8,409.8 | 642.0,423.6 | 664.1,422.5 cropBefore=31x36 aligned=112x112
+DEBUG candidate score=0.784 box=631,348,33x54 landmarks=643,438|671,438|661,449|645,458|666,457
+DEBUG box score=0.784 x=631,y=348,w=33,h=54
+DEBUG landmarks=643.0,388.9 | 671.1,389.0 | 660.7,405.2 | 644.7,419.3 | 666.3,418.4 cropBefore=33x54 aligned=112x112
+DEBUG candidate score=0.783 box=672,388,11x33 landmarks=638,439|668,439|658,450|640,460|665,458
+DEBUG box score=0.783 x=672,y=388,w=11,h=33
+DEBUG candidate score=0.782 box=588,387,57x35 landmarks=643,438|675,439|663,451|645,461|670,460
+DEBUG box score=0.782 x=588,y=387,w=57,h=35
+DEBUG landmarks=643.4,389.8 | 674.9,391.5 | 663.1,408.2 | 644.9,424.0 | 669.6,422.4 cropBefore=57x35 aligned=112x112
+DEBUG candidate score=0.772 box=861,347,39x51 landmarks=879,439|901,439|884,448|883,457|899,456
+DEBUG box score=0.772 x=861,y=347,w=39,h=51
+DEBUG landmarks=879.2,390.6 | 900.7,390.7 | 884.4,403.5 | 882.6,417.9 | 898.7,417.0 cropBefore=39x51 aligned=112x112
+DEBUG candidate score=0.767 box=901,347,20x52 landmarks=877,438|900,439|884,448|880,459|897,458
+DEBUG box score=0.767 x=901,y=347,w=20,h=52
+DEBUG candidate score=0.766 box=901,386,20x33 landmarks=877,438|899,438|881,448|879,457|896,457
+DEBUG box score=0.766 x=901,y=386,w=20,h=33
+DEBUG candidate score=0.762 box=860,386,40x32 landmarks=880,439|901,438|885,448|884,456|900,456
+DEBUG box score=0.762 x=860,y=386,w=40,h=32
+DEBUG landmarks=879.7,390.6 | 901.2,389.8 | 884.7,404.0 | 884.0,416.9 | 900.3,416.3 cropBefore=40x32 aligned=112x112
+DEBUG candidate score=0.750 box=901,424,20x15 landmarks=878,439|900,439|883,448|882,457|897,456
+DEBUG box score=0.750 x=901,y=424,w=20,h=15
+[1/1] _DSC0596.JPG faces: 5 source: url
+DEBUG distance face-1/face-2: 0.0026
+DEBUG distance face-1/face-3: 0.0126
+DEBUG distance face-1/face-4: 0.0517
+DEBUG distance face-1/face-5: 0.0577
+DEBUG distance face-2/face-3: 0.0125
+DEBUG distance face-2/face-4: 0.0502
+DEBUG distance face-2/face-5: 0.0541
+DEBUG distance face-3/face-4: 0.0555
+DEBUG distance face-3/face-5: 0.0561
+DEBUG distance face-4/face-5: 0.0042
+
+Clustering...
+DEBUG face-1 => person-001
+DEBUG face-2 => person-001
+DEBUG face-3 => person-001
+DEBUG face-4 => person-001
+DEBUG face-5 => person-001
+
+minFaceSize 30 Faces: 5
+
+DEBUG candidate score=0.786 box=633,424,30x17 landmarks=637,439|667,441|654,452|640,459|662,460
+DEBUG box score=0.786 x=633,y=424,w=30,h=17
+DEBUG candidate score=0.785 box=633,386,31x36 landmarks=640,439|669,440|658,452|642,461|664,460
+DEBUG box score=0.785 x=633,y=386,w=31,h=36
+DEBUG landmarks=639.7,390.9 | 668.9,392.0 | 657.8,409.8 | 642.0,423.6 | 664.1,422.5 cropBefore=31x36 aligned=112x112
+DEBUG candidate score=0.784 box=631,348,33x54 landmarks=643,438|671,438|661,449|645,458|666,457
+DEBUG box score=0.784 x=631,y=348,w=33,h=54
+DEBUG landmarks=643.0,388.9 | 671.1,389.0 | 660.7,405.2 | 644.7,419.3 | 666.3,418.4 cropBefore=33x54 aligned=112x112
+DEBUG candidate score=0.783 box=672,388,11x33 landmarks=638,439|668,439|658,450|640,460|665,458
+DEBUG box score=0.783 x=672,y=388,w=11,h=33
+DEBUG candidate score=0.782 box=588,387,57x35 landmarks=643,438|675,439|663,451|645,461|670,460
+DEBUG box score=0.782 x=588,y=387,w=57,h=35
+DEBUG landmarks=643.4,389.8 | 674.9,391.5 | 663.1,408.2 | 644.9,424.0 | 669.6,422.4 cropBefore=57x35 aligned=112x112
+DEBUG candidate score=0.772 box=861,347,39x51 landmarks=879,439|901,439|884,448|883,457|899,456
+DEBUG box score=0.772 x=861,y=347,w=39,h=51
+DEBUG landmarks=879.2,390.6 | 900.7,390.7 | 884.4,403.5 | 882.6,417.9 | 898.7,417.0 cropBefore=39x51 aligned=112x112
+DEBUG candidate score=0.767 box=901,347,20x52 landmarks=877,438|900,439|884,448|880,459|897,458
+DEBUG box score=0.767 x=901,y=347,w=20,h=52
+DEBUG candidate score=0.766 box=901,386,20x33 landmarks=877,438|899,438|881,448|879,457|896,457
+DEBUG box score=0.766 x=901,y=386,w=20,h=33
+DEBUG candidate score=0.762 box=860,386,40x32 landmarks=880,439|901,438|885,448|884,456|900,456
+DEBUG box score=0.762 x=860,y=386,w=40,h=32
+DEBUG landmarks=879.7,390.6 | 901.2,389.8 | 884.7,404.0 | 884.0,416.9 | 900.3,416.3 cropBefore=40x32 aligned=112x112
+DEBUG candidate score=0.750 box=901,424,20x15 landmarks=878,439|900,439|883,448|882,457|897,456
+DEBUG box score=0.750 x=901,y=424,w=20,h=15
+[1/1] _DSC0596.JPG faces: 5 source: url
+DEBUG distance face-1/face-2: 0.0026
+DEBUG distance face-1/face-3: 0.0126
+DEBUG distance face-1/face-4: 0.0517
+DEBUG distance face-1/face-5: 0.0577
+DEBUG distance face-2/face-3: 0.0125
+DEBUG distance face-2/face-4: 0.0502
+DEBUG distance face-2/face-5: 0.0541
+DEBUG distance face-3/face-4: 0.0555
+DEBUG distance face-3/face-5: 0.0561
+DEBUG distance face-4/face-5: 0.0042
+
+Clustering...
+DEBUG face-1 => person-001
+DEBUG face-2 => person-001
+DEBUG face-3 => person-001
+DEBUG face-4 => person-001
+DEBUG face-5 => person-001
+
+minFaceSize 35 Faces: 2
+
+DEBUG candidate score=0.786 box=633,424,30x17 landmarks=637,439|667,441|654,452|640,459|662,460
+DEBUG box score=0.786 x=633,y=424,w=30,h=17
+DEBUG candidate score=0.785 box=633,386,31x36 landmarks=640,439|669,440|658,452|642,461|664,460
+DEBUG box score=0.785 x=633,y=386,w=31,h=36
+DEBUG candidate score=0.784 box=631,348,33x54 landmarks=643,438|671,438|661,449|645,458|666,457
+DEBUG box score=0.784 x=631,y=348,w=33,h=54
+DEBUG candidate score=0.783 box=672,388,11x33 landmarks=638,439|668,439|658,450|640,460|665,458
+DEBUG box score=0.783 x=672,y=388,w=11,h=33
+DEBUG candidate score=0.782 box=588,387,57x35 landmarks=643,438|675,439|663,451|645,461|670,460
+DEBUG box score=0.782 x=588,y=387,w=57,h=35
+DEBUG landmarks=643.4,389.8 | 674.9,391.5 | 663.1,408.2 | 644.9,424.0 | 669.6,422.4 cropBefore=57x35 aligned=112x112
+DEBUG candidate score=0.772 box=861,347,39x51 landmarks=879,439|901,439|884,448|883,457|899,456
+DEBUG box score=0.772 x=861,y=347,w=39,h=51
+DEBUG landmarks=879.2,390.6 | 900.7,390.7 | 884.4,403.5 | 882.6,417.9 | 898.7,417.0 cropBefore=39x51 aligned=112x112
+DEBUG candidate score=0.767 box=901,347,20x52 landmarks=877,438|900,439|884,448|880,459|897,458
+DEBUG box score=0.767 x=901,y=347,w=20,h=52
+DEBUG candidate score=0.766 box=901,386,20x33 landmarks=877,438|899,438|881,448|879,457|896,457
+DEBUG box score=0.766 x=901,y=386,w=20,h=33
+DEBUG candidate score=0.762 box=860,386,40x32 landmarks=880,439|901,438|885,448|884,456|900,456
+DEBUG box score=0.762 x=860,y=386,w=40,h=32
+DEBUG candidate score=0.750 box=901,424,20x15 landmarks=878,439|900,439|883,448|882,457|897,456
+DEBUG box score=0.750 x=901,y=424,w=20,h=15
+[1/1] _DSC0596.JPG faces: 2 source: url
+DEBUG distance face-1/face-2: 0.0555
+
+Clustering...
+DEBUG face-1 => person-001
+DEBUG face-2 => person-001
+
+minFaceSize 40 Faces: 0
+DEBUG candidate score=0.786 box=633,424,30x17 landmarks=637,439|667,441|654,452|640,459|662,460
+DEBUG box score=0.786 x=633,y=424,w=30,h=17
+DEBUG candidate score=0.785 box=633,386,31x36 landmarks=640,439|669,440|658,452|642,461|664,460
+DEBUG box score=0.785 x=633,y=386,w=31,h=36
+DEBUG candidate score=0.784 box=631,348,33x54 landmarks=643,438|671,438|661,449|645,458|666,457
+DEBUG box score=0.784 x=631,y=348,w=33,h=54
+DEBUG candidate score=0.783 box=672,388,11x33 landmarks=638,439|668,439|658,450|640,460|665,458
+DEBUG box score=0.783 x=672,y=388,w=11,h=33
+DEBUG candidate score=0.782 box=588,387,57x35 landmarks=643,438|675,439|663,451|645,461|670,460
+DEBUG box score=0.782 x=588,y=387,w=57,h=35
+DEBUG candidate score=0.772 box=861,347,39x51 landmarks=879,439|901,439|884,448|883,457|899,456
+DEBUG box score=0.772 x=861,y=347,w=39,h=51
+DEBUG candidate score=0.767 box=901,347,20x52 landmarks=877,438|900,439|884,448|880,459|897,458
+DEBUG box score=0.767 x=901,y=347,w=20,h=52
+DEBUG candidate score=0.766 box=901,386,20x33 landmarks=877,438|899,438|881,448|879,457|896,457
+DEBUG box score=0.766 x=901,y=386,w=20,h=33
+DEBUG candidate score=0.762 box=860,386,40x32 landmarks=880,439|901,438|885,448|884,456|900,456
+DEBUG box score=0.762 x=860,y=386,w=40,h=32
+DEBUG candidate score=0.750 box=901,424,20x15 landmarks=878,439|900,439|883,448|882,457|897,456
+DEBUG box score=0.750 x=901,y=424,w=20,h=15
+[1/1] _DSC0596.JPG faces: 0 source: url
+
+Clustering...
+
+
+minFaceSize 45 Faces: 0
+
+DEBUG candidate score=0.786 box=633,424,30x17 landmarks=637,439|667,441|654,452|640,459|662,460
+DEBUG box score=0.786 x=633,y=424,w=30,h=17
+DEBUG candidate score=0.785 box=633,386,31x36 landmarks=640,439|669,440|658,452|642,461|664,460
+DEBUG box score=0.785 x=633,y=386,w=31,h=36
+DEBUG candidate score=0.784 box=631,348,33x54 landmarks=643,438|671,438|661,449|645,458|666,457
+DEBUG box score=0.784 x=631,y=348,w=33,h=54
+DEBUG candidate score=0.783 box=672,388,11x33 landmarks=638,439|668,439|658,450|640,460|665,458
+DEBUG box score=0.783 x=672,y=388,w=11,h=33
+DEBUG candidate score=0.782 box=588,387,57x35 landmarks=643,438|675,439|663,451|645,461|670,460
+DEBUG box score=0.782 x=588,y=387,w=57,h=35
+DEBUG candidate score=0.772 box=861,347,39x51 landmarks=879,439|901,439|884,448|883,457|899,456
+DEBUG box score=0.772 x=861,y=347,w=39,h=51
+DEBUG candidate score=0.767 box=901,347,20x52 landmarks=877,438|900,439|884,448|880,459|897,458
+DEBUG box score=0.767 x=901,y=347,w=20,h=52
+DEBUG candidate score=0.766 box=901,386,20x33 landmarks=877,438|899,438|881,448|879,457|896,457
+DEBUG box score=0.766 x=901,y=386,w=20,h=33
+DEBUG candidate score=0.762 box=860,386,40x32 landmarks=880,439|901,438|885,448|884,456|900,456
+DEBUG box score=0.762 x=860,y=386,w=40,h=32
+DEBUG candidate score=0.750 box=901,424,20x15 landmarks=878,439|900,439|883,448|882,457|897,456
+DEBUG box score=0.750 x=901,y=424,w=20,h=15
+[1/1] _DSC0596.JPG faces: 0 source: url
+
+minFaceSize 50 Faces: 0
+minFaceSize 55 Faces: 
+minFaceSize 30 Faces: 

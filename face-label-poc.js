@@ -369,12 +369,11 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       aspectRatio > options.maxFaceAspectRatio
     )
       continue;
-
+      
     // 🔴 [J] LANDMARKS THỰC TẾ DÙNG CHO ALIGNMENT
-    // FIX: Clipping landmarks giống như box để maintain geometric consistency
     const landmarks = detection.landmarks.map((point) => ({
-      x: Math.max(0, Math.min(width, (point.x - detectorOffsetX) / detectorScale)),
-      y: Math.max(0, Math.min(height, (point.y - detectorOffsetY) / detectorScale)),
+      x: (point.x - detectorOffsetX) / detectorScale,
+      y: (point.y - detectorOffsetY) / detectorScale,
     }));
     const cropBefore = await sharp(resized.data, { raw: resized.info })
       .extract({ left, top, width: boxWidth, height: boxHeight })
