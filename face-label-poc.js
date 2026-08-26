@@ -18,7 +18,7 @@ const defaults = {
   timeout: 30000,
   minConfidence: 0.75,
   nmsThreshold: 0.5,
-  minFaceSize: 60,
+  minFaceSize: 20,
   maxFaceAspectRatio: 2.5,
   maxDimension: 1600,
 };
@@ -134,22 +134,29 @@ function decodeDetections(result, inputSize, minConfidence, nmsThreshold) {
   const detections = [];
   for (const stride of [8, 16, 32]) {
     const count = (inputSize / stride) ** 2;
+    // 🔴 [A] LẤY RAW OUTPUT CỦA YUNET
     const scores = result[`cls_${stride}`].data;
     const objects = result[`obj_${stride}`].data;
     const boxes = result[`bbox_${stride}`].data;
     const keypoints = result[`kps_${stride}`].data;
+
     for (let index = 0; index < count; index += 1) {
+      // 🔴 [B] TÍNH SCORE
       const confidence = scores[index] * objects[index];
       if (confidence < minConfidence) continue;
       const column = index % (inputSize / stride);
       const row = Math.floor(index / (inputSize / stride));
       const offset = index * 4;
+
+      // 🔴 [C] DECODE 5 LANDMARKS
       const landmarks = [];
       for (let point = 0; point < 5; point += 1)
         landmarks.push({
           x: (column + keypoints[index * 10 + point * 2]) * stride,
           y: (row + keypoints[index * 10 + point * 2 + 1]) * stride,
         });
+
+      // 🔴🔴 [D] DECODE BOUNDING BOX
       detections.push({
         confidence,
         left: (column - boxes[offset]) * stride,
@@ -165,7 +172,10 @@ function decodeDetections(result, inputSize, minConfidence, nmsThreshold) {
   while (detections.length) {
     const candidate = detections.shift();
     kept.push(candidate);
+
+    // 🔴 [E] NMS
     for (let index = detections.length - 1; index >= 0; index -= 1) {
+      // 🔴 [F] TÍNH IoU
       if (intersectionOverUnion(candidate, detections[index]) > nmsThreshold)
         detections.splice(index, 1);
     }
@@ -243,17 +253,18 @@ function sampleAligned(source, width, height, transform) {
       for (let channel = 0; channel < 3; channel += 1) {
         const value =
           (1 - yWeight) *
-            ((1 - xWeight) * source[(y0 * width + x0) * 3 + channel] +
-              xWeight * source[(y0 * width + x1) * 3 + channel]) +
+          ((1 - xWeight) * source[(y0 * width + x0) * 3 + channel] +
+            xWeight * source[(y0 * width + x1) * 3 + channel]) +
           yWeight *
-            ((1 - xWeight) * source[(y1 * width + x0) * 3 + channel] +
-              xWeight * source[(y1 * width + x1) * 3 + channel]);
+          ((1 - xWeight) * source[(y1 * width + x0) * 3 + channel] +
+            xWeight * source[(y1 * width + x1) * 3 + channel]);
         output[(targetY * 112 + targetX) * 3 + channel] = Math.round(value);
       }
     }
   return output;
 }
 
+// 🔴 [G] IoU CỦA NMS
 function intersectionOverUnion(first, second) {
   const width = Math.max(
     0,
@@ -328,6 +339,8 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     options.minConfidence,
     options.nmsThreshold,
   )) {
+    // 🔴 [H] CHUYỂN BOX TỪ HỆ TỌA ĐỘ 640
+    //     VỀ HỆ TỌA ĐỘ ẢNH ĐÃ RESIZE
     const toSourceX = (value) =>
       Math.round((value - detectorOffsetX) / detectorScale);
     const toSourceY = (value) =>
@@ -336,9 +349,12 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     const top = Math.max(0, toSourceY(detection.top));
     const right = Math.min(width, toSourceX(detection.right));
     const bottom = Math.min(height, toSourceY(detection.bottom));
+
+    // 🔴 [I] DEBUG LANDMARKS — CÓ CÔNG THỨC KHÁC
     if (options.debug)
       console.log(
-        `DEBUG candidate score=${detection.confidence.toFixed(3)} box=${left},${top},${right - left}x${bottom - top} landmarks=${detection.landmarks.map((point) => `${((point.x * width) / detectorSize).toFixed(0)},${((point.y * height) / detectorSize).toFixed(0)}`).join("|")}`,
+        `DEBUG candidate score=${detection.confidence.toFixed(3)} box=${left},${top},${right - left}x${bottom - top} landmarks=${detection.landmarks
+          .map((point) => `${((point.x * width) / detectorSize).toFixed(0)},${((point.y * height) / detectorSize).toFixed(0)}`).join("|")}`,
       );
     if (options.debug)
       console.log(
@@ -353,6 +369,8 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       aspectRatio > options.maxFaceAspectRatio
     )
       continue;
+      
+    // 🔴 [J] LANDMARKS THỰC TẾ DÙNG CHO ALIGNMENT
     const landmarks = detection.landmarks.map((point) => ({
       x: (point.x - detectorOffsetX) / detectorScale,
       y: (point.y - detectorOffsetY) / detectorScale,
@@ -462,7 +480,7 @@ function escapeHtml(value) {
     /[&<>"']/g,
     (character) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        character
+      character
       ],
   );
 }
