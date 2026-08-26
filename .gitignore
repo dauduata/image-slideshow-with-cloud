@@ -2,3 +2,4 @@
 /.env
 /FE/.firebase/
 /node_modules
+/models/
