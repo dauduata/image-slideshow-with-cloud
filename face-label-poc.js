@@ -7,7 +7,7 @@ let ort;
 
 const ROOT = __dirname;
 const defaults = {
-  input: path.join(ROOT, "image-xuatgiabedao-links.js"),
+  input: path.join(ROOT, "image-onedrive-links.js"),
   // input: path.join(ROOT, 'image-onedrive-links.js'),
   output: path.join(ROOT, "image-onedrive-links-labeled.js"),
   report: path.join(ROOT, "face-clusters-report.html"),
@@ -142,7 +142,10 @@ function decodeDetections(result, inputSize, minConfidence, nmsThreshold) {
 
     for (let index = 0; index < count; index += 1) {
       // 🔴 [B] TÍNH SCORE
-      const confidence = scores[index] * objects[index];
+      const clsScore = Math.max(0, Math.min(1, scores[index]));
+      const objScore = Math.max(0, Math.min(1, objects[index]));
+      const confidence = Math.sqrt(clsScore * objScore);
+      // const confidence = scores[index] * objects[index];
       if (confidence < minConfidence) continue;
       const column = index % (inputSize / stride);
       const row = Math.floor(index / (inputSize / stride));
@@ -157,12 +160,23 @@ function decodeDetections(result, inputSize, minConfidence, nmsThreshold) {
         });
 
       // 🔴🔴 [D] DECODE BOUNDING BOX
+      //update
+      const cx = (column + boxes[offset]) * stride;
+      const cy = (row + boxes[offset + 1]) * stride;
+      const w = Math.exp(boxes[offset + 2]) * stride;
+      const h = Math.exp(boxes[offset + 3]) * stride;
+
+      const left = cx - w / 2;
+      const top = cy - h / 2;
+      const right = cx + w / 2;
+      const bottom = cy + h / 2;
+
       detections.push({
         confidence,
-        left: (column - boxes[offset]) * stride,
-        top: (row - boxes[offset + 1]) * stride,
-        right: (column + boxes[offset + 2]) * stride,
-        bottom: (row + boxes[offset + 3]) * stride,
+        left,
+        top,
+        right,
+        bottom,
         landmarks,
       });
     }
@@ -176,8 +190,15 @@ function decodeDetections(result, inputSize, minConfidence, nmsThreshold) {
     // 🔴 [E] NMS
     for (let index = detections.length - 1; index >= 0; index -= 1) {
       // 🔴 [F] TÍNH IoU
-      if (intersectionOverUnion(candidate, detections[index]) > nmsThreshold)
+      const iou = intersectionOverUnion(candidate, detections[index]);
+      if (iou > nmsThreshold) {
+        // 🔴 [G] LOẠI BỎ CÁC BOX TRÙNG NHAU
+        // ghi ra log để debug
+        console.log(
+          `DEBUG NMS: IoU ${iou.toFixed(3)} candidate=${candidate.confidence.toFixed(3)} box=${candidate.left},${candidate.top},${candidate.right - candidate.left}x${candidate.bottom - candidate.top} vs detection=${detections[index].confidence.toFixed(3)} box=${detections[index].left},${detections[index].top},${detections[index].right - detections[index].left}x${detections[index].bottom - detections[index].top}`,
+        );
         detections.splice(index, 1);
+      }
     }
   }
   return kept;
@@ -369,7 +390,7 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       aspectRatio > options.maxFaceAspectRatio
     )
       continue;
-      
+
     // 🔴 [J] LANDMARKS THỰC TẾ DÙNG CHO ALIGNMENT
     const landmarks = detection.landmarks.map((point) => ({
       x: (point.x - detectorOffsetX) / detectorScale,
