@@ -7,7 +7,7 @@ let ort;
 
 const ROOT = __dirname;
 const defaults = {
-  input: path.join(ROOT, "image-onedrive-links.js"),
+  input: path.join(ROOT, "image-xuatgiabedao-links.js"),
   // input: path.join(ROOT, 'image-onedrive-links.js'),
   output: path.join(ROOT, "image-onedrive-links-labeled.js"),
   report: path.join(ROOT, "face-clusters-report.html"),
@@ -193,10 +193,6 @@ function decodeDetections(result, inputSize, minConfidence, nmsThreshold) {
       const iou = intersectionOverUnion(candidate, detections[index]);
       if (iou > nmsThreshold) {
         // 🔴 [G] LOẠI BỎ CÁC BOX TRÙNG NHAU
-        // ghi ra log để debug
-        console.log(
-          `DEBUG NMS: IoU ${iou.toFixed(3)} candidate=${candidate.confidence.toFixed(3)} box=${candidate.left},${candidate.top},${candidate.right - candidate.left}x${candidate.bottom - candidate.top} vs detection=${detections[index].confidence.toFixed(3)} box=${detections[index].left},${detections[index].top},${detections[index].right - detections[index].left}x${detections[index].bottom - detections[index].top}`,
-        );
         detections.splice(index, 1);
       }
     }
@@ -463,36 +459,132 @@ function cosineDistance(first, second) {
   );
 }
 
-function cluster(embeddings, threshold) {
-  const labels = Array(embeddings.length).fill(-1);
-  const visited = new Set();
-  let group = 0;
-  const neighbors = (index) =>
-    embeddings
-      .map((embedding, candidate) =>
-        cosineDistance(embeddings[index], embedding) <= threshold
-          ? candidate
-          : -1,
-      )
-      .filter((candidate) => candidate >= 0);
-  for (let index = 0; index < embeddings.length; index += 1) {
-    if (visited.has(index)) continue;
-    visited.add(index);
-    const nearby = neighbors(index);
-    if (nearby.length < 2) continue;
-    labels[index] = group;
-    const queue = [...nearby];
-    while (queue.length) {
-      const current = queue.shift();
-      if (!visited.has(current)) {
-        visited.add(current);
-        const expanded = neighbors(current);
-        if (expanded.length >= 2) queue.push(...expanded);
-      }
-      if (labels[current] < 0) labels[current] = group;
+function cluster(embeddings, imageIds, threshold) {
+  const distanceMatrix = Array.from(
+    { length: embeddings.length },
+    () => Array(embeddings.length).fill(0),
+  );
+
+  // Tính cosine distance giữa mọi cặp embedding.
+  for (let first = 0; first < embeddings.length; first += 1)
+    for (let second = first + 1; second < embeddings.length; second += 1) {
+      const distance = cosineDistance(embeddings[first], embeddings[second]);
+      distanceMatrix[first][second] = distance;
+      distanceMatrix[second][first] = distance;
     }
-    group += 1;
+
+  let minDistance = Infinity;
+  let maxDistance = -Infinity;
+  let distanceSum = 0;
+  let distanceCount = 0;
+  for (let first = 0; first < embeddings.length; first += 1)
+    for (let second = first + 1; second < embeddings.length; second += 1) {
+      const distance = distanceMatrix[first][second];
+      minDistance = Math.min(minDistance, distance);
+      maxDistance = Math.max(maxDistance, distance);
+      distanceSum += distance;
+      distanceCount += 1;
+    }
+  console.log(
+    `[CLUSTER] START faces=${embeddings.length} threshold=${threshold} ` +
+      `pairs=${distanceCount} ` +
+      `min=${(distanceCount ? minDistance : 0).toFixed(4)} ` +
+      `avg=${(distanceCount ? distanceSum / distanceCount : 0).toFixed(4)} ` +
+      `max=${(distanceCount ? maxDistance : 0).toFixed(4)}`,
+  );
+
+  // Mỗi embedding ban đầu là một cluster.
+  let clusters = embeddings.map((_, index) => [index]);
+  let mergeCount = 0;
+  let sameImageRejected = 0;
+  while (true) {
+    let bestPair = null;
+    let bestDistance = Infinity;
+
+    // Chọn cặp có complete-linkage distance nhỏ nhất.
+    for (let first = 0; first < clusters.length; first += 1)
+      for (let second = first + 1; second < clusters.length; second += 1) {
+        const imagesInFirstCluster = new Set(
+          clusters[first].map((index) => imageIds[index]),
+        );
+        const hasSameImage = clusters[second].some((index) =>
+          imagesInFirstCluster.has(imageIds[index]),
+        );
+        if (hasSameImage) {
+          sameImageRejected += 1;
+          continue;
+        }
+
+        let completeDistance = 0;
+        for (const firstIndex of clusters[first])
+          for (const secondIndex of clusters[second])
+            completeDistance = Math.max(
+              completeDistance,
+              distanceMatrix[firstIndex][secondIndex],
+            );
+        if (
+          completeDistance < bestDistance ||
+          (completeDistance === bestDistance &&
+            (bestPair === null || first < bestPair[0] ||
+              (first === bestPair[0] && second < bestPair[1])))
+        ) {
+          bestDistance = completeDistance;
+          bestPair = [first, second];
+        }
+      }
+    if (bestPair === null) {
+      console.log(
+        `[CLUSTER] STOP no-valid-pair clusters=${clusters.length}`,
+      );
+      break;
+    }
+    const [first, second] = bestPair;
+    if (bestDistance > threshold) {
+      console.log(
+        `[CLUSTER] STOP threshold distance=${bestDistance.toFixed(4)} ` +
+          `threshold=${threshold} A=[${clusters[first].join(",")}] ` +
+          `B=[${clusters[second].join(",")}]`,
+      );
+      break;
+    }
+
+    const pairDistances = [];
+    for (const firstIndex of clusters[first])
+      for (const secondIndex of clusters[second])
+        pairDistances.push({
+          firstIndex,
+          secondIndex,
+          distance: distanceMatrix[firstIndex][secondIndex],
+        });
+    pairDistances.sort((left, right) => right.distance - left.distance);
+    console.log(
+      `[CLUSTER] MERGE #${mergeCount + 1} ` +
+        `complete=${bestDistance.toFixed(4)} threshold=${threshold} ` +
+        `A=[${clusters[first].join(",")}] B=[${clusters[second].join(",")}]`,
+    );
+    for (const pair of pairDistances)
+      console.log(
+        `  face ${pair.firstIndex} (image=${imageIds[pair.firstIndex]}) ` +
+          `<-> face ${pair.secondIndex} (image=${imageIds[pair.secondIndex]}) ` +
+          `distance=${pair.distance.toFixed(4)}`,
+      );
+    clusters[first] = [...clusters[first], ...clusters[second]];
+    clusters.splice(second, 1);
+    mergeCount += 1;
   }
+
+  const labels = Array(embeddings.length).fill(-1);
+  clusters
+    .sort((first, second) => first[0] - second[0])
+    .forEach((members, label) => {
+      members.forEach((index) => {
+        labels[index] = label;
+      });
+    });
+  console.log(
+    `[CLUSTER] DONE groups=${clusters.length} merges=${mergeCount} ` +
+      `sameImageRejected=${sameImageRejected}`,
+  );
   return labels;
 }
 
@@ -605,6 +697,7 @@ async function main() {
   const clusteringStarted = Date.now();
   const labels = cluster(
     faces.map((face) => face.embedding),
+    faces.map((face) => face.imageIndex),
     options.threshold,
   );
   const clusteringTime = Date.now() - clusteringStarted;
