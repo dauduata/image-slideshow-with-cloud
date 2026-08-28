@@ -418,12 +418,23 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     });
     const values = Array.from(result[recognizer.outputNames[0]].data);
     const length = Math.hypot(...values) || 1;
+    
+    console.log(
+      `[EMBEDDING] output=${recognizer.outputNames[0]} dim=${values.length}`,
+    );
+    
+    const normalized = values.map((value) => value / length);
+
+    console.log(
+      `[EMBEDDING] normalizedNorm=${Math.hypot(...normalized).toFixed(6)}`,
+    );
+
     if (options.debug)
       console.log(
         `DEBUG landmarks=${landmarks.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" | ")} cropBefore=${boxWidth}x${boxHeight} aligned=112x112`,
       );
     faces.push({
-      embedding: values.map((value) => value / length),
+      embedding: normalized,
       preview: `data:image/jpeg;base64,${previewAligned.toString("base64")}`,
       previewBefore: `data:image/jpeg;base64,${previewBefore.toString("base64")}`,
       landmarks,
@@ -454,9 +465,19 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
 }
 
 function cosineDistance(first, second) {
-  return (
-    1 - first.reduce((sum, value, index) => sum + value * second[index], 0)
+  if (first.length !== second.length) {
+    throw new Error(
+      `Embedding dimension mismatch: ${first.length} vs ${second.length}`,
+    );
+  }
+
+  const similarity = first.reduce(
+    (sum, value, index) =>
+      sum + value * second[index],
+    0,
   );
+
+  return 1 - similarity;
 }
 
 function cluster(embeddings, imageIds, threshold) {
@@ -487,10 +508,10 @@ function cluster(embeddings, imageIds, threshold) {
     }
   console.log(
     `[CLUSTER] START faces=${embeddings.length} threshold=${threshold} ` +
-      `pairs=${distanceCount} ` +
-      `min=${(distanceCount ? minDistance : 0).toFixed(4)} ` +
-      `avg=${(distanceCount ? distanceSum / distanceCount : 0).toFixed(4)} ` +
-      `max=${(distanceCount ? maxDistance : 0).toFixed(4)}`,
+    `pairs=${distanceCount} ` +
+    `min=${(distanceCount ? minDistance : 0).toFixed(4)} ` +
+    `avg=${(distanceCount ? distanceSum / distanceCount : 0).toFixed(4)} ` +
+    `max=${(distanceCount ? maxDistance : 0).toFixed(4)}`,
   );
 
   // Mỗi embedding ban đầu là một cluster.
@@ -542,8 +563,8 @@ function cluster(embeddings, imageIds, threshold) {
     if (bestDistance > threshold) {
       console.log(
         `[CLUSTER] STOP threshold distance=${bestDistance.toFixed(4)} ` +
-          `threshold=${threshold} A=[${clusters[first].join(",")}] ` +
-          `B=[${clusters[second].join(",")}]`,
+        `threshold=${threshold} A=[${clusters[first].join(",")}] ` +
+        `B=[${clusters[second].join(",")}]`,
       );
       break;
     }
@@ -559,14 +580,14 @@ function cluster(embeddings, imageIds, threshold) {
     pairDistances.sort((left, right) => right.distance - left.distance);
     console.log(
       `[CLUSTER] MERGE #${mergeCount + 1} ` +
-        `complete=${bestDistance.toFixed(4)} threshold=${threshold} ` +
-        `A=[${clusters[first].join(",")}] B=[${clusters[second].join(",")}]`,
+      `complete=${bestDistance.toFixed(4)} threshold=${threshold} ` +
+      `A=[${clusters[first].join(",")}] B=[${clusters[second].join(",")}]`,
     );
     for (const pair of pairDistances)
       console.log(
         `  face ${pair.firstIndex} (image=${imageIds[pair.firstIndex]}) ` +
-          `<-> face ${pair.secondIndex} (image=${imageIds[pair.secondIndex]}) ` +
-          `distance=${pair.distance.toFixed(4)}`,
+        `<-> face ${pair.secondIndex} (image=${imageIds[pair.secondIndex]}) ` +
+        `distance=${pair.distance.toFixed(4)}`,
       );
     clusters[first] = [...clusters[first], ...clusters[second]];
     clusters.splice(second, 1);
@@ -583,7 +604,7 @@ function cluster(embeddings, imageIds, threshold) {
     });
   console.log(
     `[CLUSTER] DONE groups=${clusters.length} merges=${mergeCount} ` +
-      `sameImageRejected=${sameImageRejected}`,
+    `sameImageRejected=${sameImageRejected}`,
   );
   return labels;
 }
