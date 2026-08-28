@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Person Management</title>
+    <link rel="stylesheet" href="/person-management/styles.css">
+</head>
+
+<body>
+    <main>
+        <header>
+            <div>
+                <p class="eyebrow">IMAGE INDEX</p>
+                <h1>People</h1>
+            </div>
+            <nav><a href="/FE/">Gallery</a><a href="/face-clusters-report/">Clusters</a></nav>
+        </header>
+        <div class="toolbar"><button id="refresh" type="button">Refresh</button><button id="save" type="button">Save
+                All</button><button id="generate" type="button">Generate FE Data</button></div>
+        <p id="status" role="status">Loading people...</p>
+        <section id="people" class="people" aria-live="polite"></section>
+    </main>
+    <script src="/person-management/app.js"></script>
+</body>
+
+</html>

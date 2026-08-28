@@ -1,0 +1,169 @@
+:root {
+    --ink: #f3f0e7;
+    --muted: #999d96;
+    --line: #353a35;
+    --panel: #1a1e1b;
+    --accent: #d4ef55
+}
+
+* {
+    box-sizing: border-box
+}
+
+body {
+    margin: 0;
+    color: var(--ink);
+    background: radial-gradient(circle at 85% 0%, #39462a 0, transparent 28rem), linear-gradient(135deg, #101311, #1b211c);
+    font-family: Georgia, 'Times New Roman', serif
+}
+
+main {
+    width: min(1120px, calc(100% - 32px));
+    margin: auto;
+    padding: 48px 0 72px
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    margin-bottom: 38px
+}
+
+h1 {
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 400;
+    line-height: .8;
+    margin: 0
+}
+
+.eyebrow,
+.person-id,
+.count,
+label,
+.toolbar,
+nav,
+#status {
+    font-family: ui-sans-serif, system-ui, sans-serif
+}
+
+.eyebrow {
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: .16em;
+    margin: 0 0 18px
+}
+
+nav {
+    display: flex;
+    gap: 18px
+}
+
+a {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 4px
+}
+
+a:hover {
+    color: var(--accent);
+    border-color: var(--accent)
+}
+
+.toolbar {
+    display: flex;
+    gap: 8px;
+    border-block: 1px solid var(--line);
+    padding: 14px 0;
+    margin-bottom: 22px
+}
+
+button {
+    border: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--panel);
+    color: var(--ink);
+    padding: 10px 14px;
+    cursor: pointer
+}
+
+button:hover {
+    border-color: var(--accent);
+    color: var(--accent)
+}
+
+#status {
+    color: var(--muted);
+    font-size: 13px
+}
+
+#status[data-error=true] {
+    color: #ff9b8f
+}
+
+.people {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 14px
+}
+
+.person {
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    gap: 16px;
+    border: 1px solid var(--line);
+    background: rgba(26, 30, 27, .8);
+    padding: 14px
+}
+
+.person img {
+    width: 128px;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: #0a0c0b
+}
+
+.person-id {
+    margin: 3px 0 4px;
+    font-size: 14px
+}
+
+.count {
+    margin: 0 0 24px;
+    color: var(--muted);
+    font-size: 12px
+}
+
+label {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 6px
+}
+
+input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    background: #0c0e0d;
+    color: var(--ink);
+    padding: 10px;
+    font: 14px ui-sans-serif, system-ui, sans-serif
+}
+
+@media(max-width:600px) {
+    main {
+        padding-top: 28px
+    }
+
+    header {
+        align-items: start;
+        flex-direction: column;
+        gap: 28px
+    }
+
+    .toolbar {
+        flex-wrap: wrap
+    }
+}

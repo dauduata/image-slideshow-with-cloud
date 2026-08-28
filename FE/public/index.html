@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="vi">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +8,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <main>
     <header>
@@ -16,6 +18,12 @@
         <button class="go-to-button" id="go-to-button" type="button" disabled>Go to</button>
       </div>
     </header>
+    <div class="filter-tools">
+      <label for="person-filter">Person</label>
+      <select id="person-filter">
+        <option value="">All persons</option>
+      </select>
+    </div>
     <section class="gallery-shell" aria-label="Image gallery">
       <div class="gallery swiper" id="gallery">
         <div class="swiper-wrapper"></div>
@@ -38,7 +46,8 @@
     </form>
   </dialog>
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-  <script src="image-onedrive-links.js"></script>
+  <script src="/FE/seriesData.js"></script>
   <script src="app.js"></script>
 </body>
+
 </html>

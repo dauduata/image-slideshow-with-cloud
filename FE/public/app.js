@@ -8,6 +8,7 @@ const goToDialog = document.querySelector('#go-to-dialog');
 const goToForm = document.querySelector('#go-to-form');
 const imageIndexInput = document.querySelector('#image-index');
 const goToCancel = document.querySelector('#go-to-cancel');
+const personFilter = document.querySelector('#person-filter');
 
 function imageUrl(item, width = 2400) {
   let sourceUrl;
@@ -85,10 +86,21 @@ const source = driveConfig.apiKey && driveConfig.folderId
   ? loadGoogleDriveImages(driveConfig)
   : Promise.resolve(typeof seriesData === 'undefined' ? [] : seriesData);
 
+function displayPerson(personId) {
+  return window.personAliases?.[personId] || personId;
+}
+
+function populatePersonFilter(items) {
+  const personIds = [...new Set(items.flatMap((item) => Array.isArray(item.persons) ? item.persons : []))].sort();
+  personIds.forEach((personId) => personFilter.add(new Option(displayPerson(personId), personId)));
+}
+
 source
   .then((items) => {
     if (!Array.isArray(items) || items.length === 0) throw new Error('The JSON file contains no images');
-    const images = items.filter((item) => item && imageUrl(item));
+    const allImages = items.filter((item) => item && imageUrl(item));
+    populatePersonFilter(allImages);
+    let images = allImages;
     const storageKey = `image-gallery-index:${dataFile}`;
     const savedIndex = Number.parseInt(localStorage.getItem(storageKey), 10);
     const initialSlide = Number.isInteger(savedIndex)
@@ -126,6 +138,16 @@ source
           if (swiperInstance.isBeginning && swiperInstance.swipeDirection === 'prev') swiperInstance.slideTo(images.length - 1);
         }
       }
+    });
+    personFilter.addEventListener('change', () => {
+      images = personFilter.value
+        ? allImages.filter((item) => item.persons?.includes(personFilter.value))
+        : allImages;
+      swiper.virtual.slides = images;
+      swiper.virtual.update(true);
+      swiper.slideTo(0, 0);
+      imageIndexInput.max = String(images.length);
+      meta.textContent = `${images.length} images · ${dataFile}`;
     });
     imageIndexInput.max = String(images.length);
     goToButton.disabled = false;

@@ -4,6 +4,7 @@
   "private": true,
   "description": "Extract public image links from a Google Drive folder",
   "scripts": {
+    "start": "node server.js",
     "extract": "node extract-drive-images.js",
     "extract:onedrive": "node extract-onedrive-images.js",
     "face-label": "node face-label-poc.js",

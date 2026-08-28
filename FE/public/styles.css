@@ -53,6 +53,27 @@ h1 {
   text-transform: uppercase;
 }
 
+.filter-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font: 12px ui-sans-serif, system-ui, sans-serif;
+}
+
+.filter-tools label {
+  color: var(--muted);
+}
+
+#person-filter {
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--ink);
+  background: var(--panel);
+  padding: 8px 10px;
+  font: 13px ui-sans-serif, system-ui, sans-serif;
+}
+
 button {
   border: 1px solid var(--line);
   border-radius: 0;

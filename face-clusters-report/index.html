@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Face Clusters</title>
+    <link rel="stylesheet" href="/face-clusters-report/style.css">
+</head>
+
+<body>
+    <main>
+        <header>
+            <div>
+                <p class="eyebrow">LABELING / REVIEW</p>
+                <h1>Face clusters</h1>
+            </div>
+            <nav><a href="/">People</a><a href="/FE/">Gallery</a></nav>
+        </header><label class="filter-label" for="person-filter">Person</label><select id="person-filter">
+            <option value="">All persons</option>
+        </select>
+        <p id="status">Loading clusters...</p>
+        <section id="clusters" class="clusters"></section>
+    </main>
+    <script src="/face-clusters-report/app.js"></script>
+</body>
+
+</html>
