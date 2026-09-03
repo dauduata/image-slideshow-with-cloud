@@ -4,24 +4,65 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Person Management</title>
+    <title>Image Management</title>
     <link rel="stylesheet" href="/person-management/styles.css">
 </head>
 
 <body>
     <main>
-        <header>
-            <div>
-                <p class="eyebrow">IMAGE INDEX</p>
-                <h1>People</h1>
+        <!-- PAGE 1: Generate Image from Cloud -->
+        <section id="page-generate" class="page" style="display: none;">
+            <header>
+                <div>
+                    <p class="eyebrow">IMAGE EXTRACTION</p>
+                    <h1>Generate Image from Cloud</h1>
+                </div>
+            </header>
+
+            <div class="form-section">
+                <label for="cloud-url">URL</label>
+                <div class="input-group">
+                    <input id="cloud-url" type="text" placeholder="Public cloud folder URL (Google Drive or OneDrive)">
+                    <button id="open-url-btn" type="button">Open URL</button>
+                </div>
+                <p class="help-text">Paste a shared Google Drive or OneDrive folder URL</p>
             </div>
-            <nav><a href="/FE/">Gallery</a><a href="/face-clusters-report/">Clusters</a></nav>
-        </header>
-        <div class="toolbar"><button id="refresh" type="button">Refresh</button><button id="save" type="button">Save
-                All</button><button id="generate" type="button">Generate FE Data</button></div>
-        <p id="status" role="status">Loading people...</p>
-        <section id="people" class="people" aria-live="polite"></section>
+
+            <div class="action-section">
+                <button id="generate-btn" type="button" class="primary-btn">Generate</button>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <span>Job Log</span>
+                    <button id="clear-log-btn" type="button" class="small-btn">Clear</button>
+                </div>
+                <textarea id="job-log" readonly></textarea>
+            </div>
+
+            <div class="nav-section">
+                <button id="go-to-gallery-btn" type="button" class="nav-btn" disabled>Go to Gallery</button>
+            </div>
+        </section>
+
+        <!-- PAGE 2: Gallery -->
+        <section id="page-gallery" class="page" style="display: none;">
+            <header>
+                <div>
+                    <p class="eyebrow">GENERATED IMAGES</p>
+                    <h1>Gallery</h1>
+                </div>
+                <nav>
+                    <button id="back-to-generate-btn" type="button" class="nav-link">← Back to Generate</button>
+                </nav>
+            </header>
+
+            <div id="gallery-container" class="gallery-container">
+                <p id="gallery-status">Loading gallery...</p>
+            </div>
+        </section>
     </main>
+
     <script src="/person-management/app.js"></script>
 </body>
 
