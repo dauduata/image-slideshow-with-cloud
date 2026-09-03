@@ -10,7 +10,7 @@ const oneDrive = require('./extract/onedrive/service');
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
 const ALIASES_FILE = path.join(ROOT, 'data', 'person-aliases.json');
-const LABELED_FILE = path.join(ROOT, 'image-onedrive-links-labeled.js');
+const LABELED_FILE = path.join(ROOT, 'image-links-labeled.js');
 const GENERATED_FILE = path.join(ROOT, 'FE', 'seriesData.js');
 const REPORT_FILE = path.join(ROOT, 'face-clusters-report.html');
 const LABELING_OUTPUT_FILE = path.join(ROOT, 'image-links-labeled.js');
@@ -231,11 +231,13 @@ const server = http.createServer(async (request, response) => {
         if (url.pathname === '/api/extract/google-drive' && request.method === 'POST') {
             const input = await body(request);
             if (typeof input.folderUrl !== 'string' || !input.folderUrl) throw new Error('folderUrl is required');
+            input.outputFile = 'image-links.js';
             return startExtractionJob(response, googleDrive.run, input);
         }
         if (url.pathname === '/api/extract/onedrive' && request.method === 'POST') {
             const input = await body(request);
             if (typeof input.folderUrl !== 'string' || !input.folderUrl) throw new Error('folderUrl is required');
+            input.outputFile = input.outputFile || 'image-links.js';
             return startExtractionJob(response, oneDrive.run, input);
         }
         if (url.pathname === '/' || url.pathname === '/index.html') return serveFile(response, path.join(ROOT, 'person-management', 'index.html'));

@@ -6,7 +6,7 @@ const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp|avif)$/i;
 
 function printUsage() {
   console.log('Usage: node extract-onedrive-images.js <onedrive-folder-url> [output-file.js]');
-  console.log('Example: node extract-onedrive-images.js "https://1drv.ms/f/..." image-onedrive-links.js');
+  console.log('Example: node extract-onedrive-images.js "https://1drv.ms/f/..." image-links.js');
 }
 
 function getJavaScriptOutputPath(outputFile) {
@@ -15,7 +15,7 @@ function getJavaScriptOutputPath(outputFile) {
 
 async function main() {
   const folderUrl = process.argv[2];
-  const outputFile = process.argv[3] || 'image-onedrive-links.js';
+  const outputFile = process.argv[3] || 'image-links.js';
 
   if (!folderUrl) {
     printUsage();
