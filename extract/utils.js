@@ -3,8 +3,9 @@ const path = require('node:path');
 
 function runScript(script, args) {
     return new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, [path.join(__dirname, '..', '..', script), ...args], {
-            cwd: path.join(__dirname, '..', '..'),
+        const projectRoot = path.join(__dirname, '..');
+        const child = spawn(process.execPath, [path.join(projectRoot, script), ...args], {
+            cwd: projectRoot,
             env: process.env,
             stdio: ['ignore', 'pipe', 'pipe']
         });
