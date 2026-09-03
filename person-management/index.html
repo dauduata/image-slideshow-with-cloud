@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Image Management</title>
     <link rel="stylesheet" href="/person-management/styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
 </head>
 
 <body>
@@ -47,22 +48,38 @@
 
         <!-- PAGE 2: Gallery -->
         <section id="page-gallery" class="page" style="display: none;">
-            <header>
-                <div>
-                    <p class="eyebrow">GENERATED IMAGES</p>
-                    <h1>Gallery</h1>
-                </div>
-                <nav>
-                    <button id="back-to-generate-btn" type="button" class="nav-link">← Back to Generate</button>
-                </nav>
-            </header>
-
-            <div id="gallery-container" class="gallery-container">
-                <p id="gallery-status">Loading gallery...</p>
+            <div class="gallery-layout">
+                <aside id="labeling-panel" class="labeling-panel">
+                    <button id="collapse-labeling-btn" type="button" class="collapse-btn" aria-label="Collapse labeling panel">←</button>
+                    <div class="labeling-content">
+                        <p class="eyebrow">LABELING</p>
+                        <button id="source-url-btn" type="button" class="source-url">Source URL</button>
+                        <button id="labeling-btn" type="button" class="primary-btn">Let's labeling</button>
+                        <div class="log-section">
+                            <div class="log-header"><span>Labeling Log</span><button id="clear-label-log-btn" type="button" class="small-btn">Clear</button></div>
+                            <textarea id="label-log" readonly></textarea>
+                        </div>
+                    </div>
+                </aside>
+                <button id="expand-labeling-btn" type="button" class="expand-btn" aria-label="Expand labeling panel">→</button>
+                <section class="gallery-panel">
+                    <header>
+                        <div><p class="eyebrow">GENERATED IMAGES</p><h1>Gallery on Backend</h1></div>
+                        <nav><button id="back-to-generate-btn" type="button" class="nav-link">← Back to Generate</button></nav>
+                    </header>
+                    <div class="gallery-controls">
+                        <label for="person-filter">Person</label>
+                        <select id="person-filter" multiple size="4"></select>
+                        <label for="alias-input">Alias</label>
+                        <div class="alias-controls"><input id="alias-input" type="text" disabled><button id="update-alias-btn" type="button" disabled>Update</button></div>
+                    </div>
+                    <div id="gallery-container" class="gallery-container"><p id="gallery-status">Loading gallery...</p></div>
+                </section>
             </div>
         </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="/person-management/app.js"></script>
 </body>
 

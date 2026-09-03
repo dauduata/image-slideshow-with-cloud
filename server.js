@@ -13,6 +13,7 @@ const ALIASES_FILE = path.join(ROOT, 'data', 'person-aliases.json');
 const LABELED_FILE = path.join(ROOT, 'image-onedrive-links-labeled.js');
 const GENERATED_FILE = path.join(ROOT, 'FE', 'seriesData.js');
 const REPORT_FILE = path.join(ROOT, 'face-clusters-report.html');
+const LABELING_OUTPUT_FILE = path.join(ROOT, 'image-links-labeled.js');
 
 const jobManager = {
     jobs: new Map(),
@@ -71,6 +72,26 @@ function loadSeries(fileName) {
     return sandbox.__seriesData;
 }
 
+function runLabeling() {
+    const input = path.join(ROOT, 'image-links.js');
+    return new Promise((resolve, reject) => {
+        const child = require('node:child_process').spawn(process.execPath, [
+            path.join(ROOT, 'face-label-poc.js'),
+            '--input', input,
+            '--output', LABELING_OUTPUT_FILE,
+            '--report', REPORT_FILE
+        ], { cwd: ROOT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+        let output = '';
+        let errorOutput = '';
+        child.stdout.on('data', (chunk) => { output += chunk; });
+        child.stderr.on('data', (chunk) => { errorOutput += chunk; });
+        child.on('error', reject);
+        child.on('close', (code) => code === 0
+            ? resolve({ output: output.trim(), file: LABELING_OUTPUT_FILE })
+            : reject(new Error((errorOutput || output || `Labeling exited with code ${code}`).trim())));
+    });
+}
+
 async function ensureAliases(personIds) {
     const aliases = await readJson(ALIASES_FILE, {});
     let changed = false;
@@ -113,6 +134,17 @@ async function getPersons() {
         representative: details.get(id)?.representative || series.find((record) => record.persons?.includes(id))?.thumbnailUrl || series.find((record) => record.persons?.includes(id))?.url || '',
         images: series.filter((record) => record.persons?.includes(id)).map(({ name, url, thumbnailUrl }) => ({ name, url, thumbnailUrl: thumbnailUrl || url }))
     }));
+}
+
+function getImages(selectedPersons) {
+    const series = loadSeries(LABELED_FILE);
+    if (!selectedPersons.length || selectedPersons.includes('all')) return series;
+    return series.filter((record) => {
+        const persons = Array.isArray(record.persons) ? record.persons : [];
+        return selectedPersons.some((person) => person === 'no-person'
+            ? persons.length === 0
+            : persons.includes(person));
+    });
 }
 
 async function generateFeData() {
@@ -160,10 +192,21 @@ function startExtractionJob(response, extractor, input) {
     });
 }
 
+function startLabelingJob(response) {
+    const jobId = jobManager.createJob();
+    json(response, 202, { jobId, status: 'processing', message: 'Labeling job started' });
+    runLabeling().then((result) => {
+        jobManager.completeJob(jobId, result);
+    }).catch((error) => {
+        jobManager.failJob(jobId, error);
+    });
+}
+
 const server = http.createServer(async (request, response) => {
     try {
         const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
         if (url.pathname === '/api/persons' && request.method === 'GET') return json(response, 200, { persons: await getPersons() });
+        if (url.pathname === '/api/images' && request.method === 'GET') return json(response, 200, { images: getImages(url.searchParams.getAll('person')) });
         if (url.pathname === '/api/person-aliases' && request.method === 'GET') return json(response, 200, await readJson(ALIASES_FILE, {}));
         if (url.pathname === '/api/person-aliases' && request.method === 'POST') {
             const submitted = await body(request);
@@ -180,6 +223,9 @@ const server = http.createServer(async (request, response) => {
             const job = jobManager.getJob(url.pathname.slice('/api/job-status/'.length));
             if (!job) return json(response, 404, { error: 'Job not found' });
             return json(response, 200, job);
+        }
+        if (url.pathname === '/api/labeling' && request.method === 'POST') {
+            return startLabelingJob(response);
         }
         if (url.pathname === '/api/generate-fe-data' && request.method === 'POST') return json(response, 200, await generateFeData());
         if (url.pathname === '/api/extract/google-drive' && request.method === 'POST') {

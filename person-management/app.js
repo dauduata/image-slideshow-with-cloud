@@ -32,13 +32,26 @@ const jobLog = document.querySelector('#job-log');
 const goToGalleryBtn = document.querySelector('#go-to-gallery-btn');
 const backToGenerateBtn = document.querySelector('#back-to-generate-btn');
 const galleryContainer = document.querySelector('#gallery-container');
-const galleryStatus = document.querySelector('#gallery-status');
+let galleryStatus = document.querySelector('#gallery-status');
+const labelingPanel = document.querySelector('#labeling-panel');
+const collapseLabelingBtn = document.querySelector('#collapse-labeling-btn');
+const expandLabelingBtn = document.querySelector('#expand-labeling-btn');
+const sourceUrlBtn = document.querySelector('#source-url-btn');
+const labelingBtn = document.querySelector('#labeling-btn');
+const clearLabelLogBtn = document.querySelector('#clear-label-log-btn');
+const labelLog = document.querySelector('#label-log');
+const personFilter = document.querySelector('#person-filter');
+const aliasInput = document.querySelector('#alias-input');
+const updateAliasBtn = document.querySelector('#update-alias-btn');
 
 // ============ STATE MANAGEMENT ============
 let isProcessing = false;
 let pollingTimer = null;
 let currentJobId = null;
 let pollInFlight = false;
+let sourceUrl = '';
+let persons = [];
+let gallerySwiper = null;
 
 // ============ LOGGING ============
 function addLog(message) {
@@ -49,6 +62,12 @@ function addLog(message) {
 
 function clearLog() {
     jobLog.value = '';
+}
+
+function addLabelLog(message) {
+    const timestamp = new Date().toLocaleTimeString();
+    labelLog.value = `[${timestamp}] ${message}\n${labelLog.value}`;
+    labelLog.scrollTop = 0;
 }
 
 function stopJobPolling() {
@@ -207,6 +226,7 @@ async function checkGalleryData() {
 
 // ============ GALLERY NAVIGATION ============
 goToGalleryBtn.addEventListener('click', async () => {
+    sourceUrl = cloudUrlInput.value.trim();
     showPage('gallery');
     await loadGallery();
 });
@@ -217,10 +237,8 @@ backToGenerateBtn.addEventListener('click', () => {
 
 // ============ GALLERY LOADING ============
 async function loadGallery() {
-    galleryStatus.textContent = 'Loading gallery...';
-    galleryContainer.innerHTML = '<p id="gallery-status">Loading gallery...</p>';
-    
     try {
+        galleryStatus.textContent = 'Loading gallery...';
         const response = await fetch('/api/persons');
         const data = await response.json();
         
@@ -229,34 +247,163 @@ async function loadGallery() {
             return;
         }
         
-        if (!data.persons || data.persons.length === 0) {
+        persons = data.persons || [];
+        if (persons.length === 0) {
             galleryStatus.textContent = 'No images available. Generate images first.';
             return;
         }
-        
-        renderGallery(data.persons);
-        galleryStatus.textContent = `Loaded ${data.persons.length} people`;
+        personFilter.replaceChildren(new Option('All', 'all'), new Option('No Person', 'no-person'));
+        persons.forEach((person) => personFilter.add(new Option(person.alias || person.id, person.id)));
+        await loadFilteredImages();
     } catch (error) {
         galleryStatus.textContent = `Error: ${error.message}`;
     }
 }
 
-function renderGallery(persons) {
+async function loadFilteredImages() {
+    const selected = [...personFilter.selectedOptions].map((option) => option.value);
+    const query = new URLSearchParams();
+    if (!selected.length || selected.includes('all')) query.set('person', 'all');
+    else selected.forEach((person) => query.append('person', person));
+    galleryStatus.textContent = 'Loading images...';
+    try {
+        const response = await fetch(`/api/images?${query}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to load images');
+        renderGallery(data.images || []);
+        galleryStatus.textContent = `${data.images?.length || 0} images`;
+    } catch (error) {
+        galleryStatus.textContent = `Error: ${error.message}`;
+    }
+    updateAliasState();
+}
+
+function renderGallery(images) {
+    if (gallerySwiper) {
+        gallerySwiper.destroy(true, true);
+        gallerySwiper = null;
+    }
     galleryContainer.innerHTML = `
-        <div class="gallery-grid">
-            ${persons.map(person => `
-                <article class="gallery-item">
-                    <img src="${escapeHtml(person.representative || '')}" alt="${escapeHtml(person.id)}" loading="lazy" onerror="this.style.display='none'">
-                    <div class="gallery-item-info">
-                        <p class="gallery-item-id">${escapeHtml(person.id)}</p>
-                        <p class="gallery-item-count">${person.faceCount} face${person.faceCount === 1 ? '' : 's'}</p>
-                        <p class="gallery-item-alias">${escapeHtml(person.alias || '(no alias)')}</p>
-                    </div>
-                </article>
-            `).join('')}
+        <p id="gallery-status"></p>
+        <div class="backend-gallery swiper">
+            <div class="swiper-wrapper"></div>
+            <button class="swiper-button-prev" type="button" aria-label="Previous image"></button>
+            <button class="swiper-button-next" type="button" aria-label="Next image"></button>
         </div>
     `;
+    galleryStatus = galleryContainer.querySelector('#gallery-status');
+    if (!images.length) {
+        galleryStatus.textContent = 'No images match the selected people.';
+        return;
+    }
+    galleryStatus.textContent = '';
+    gallerySwiper = new Swiper(galleryContainer.querySelector('.backend-gallery'), {
+        virtual: {
+            slides: images,
+            addSlidesBefore: 2,
+            addSlidesAfter: 2,
+            renderSlide: (image, index) => renderGallerySlide(image, index, images.length)
+        },
+        loop: false,
+        grabCursor: true,
+        zoom: { maxRatio: 3, minRatio: 1 },
+        navigation: {
+            nextEl: galleryContainer.querySelector('.swiper-button-next'),
+            prevEl: galleryContainer.querySelector('.swiper-button-prev')
+        },
+        on: {
+            touchEnd(swiper) {
+                if (swiper.isEnd && swiper.swipeDirection === 'next') swiper.slideTo(0);
+                if (swiper.isBeginning && swiper.swipeDirection === 'prev') swiper.slideTo(images.length - 1);
+            }
+        }
+    });
 }
+
+function renderGallerySlide(image, index, total) {
+    const name = escapeHtml(image.name || `Image ${index + 1}`);
+    const source = escapeHtml(image.thumbnailUrl || image.url || '');
+    return `<article class="swiper-slide gallery-cell">
+        <div class="swiper-zoom-container">
+            <img src="${source}" alt="${name}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+        </div>
+        <div class="caption"><span>${name}</span><span>${String(index + 1).padStart(4, '0')} / ${String(total).padStart(4, '0')}</span></div>
+    </article>`;
+}
+
+function updateAliasState() {
+    const selected = [...personFilter.selectedOptions].map((option) => option.value);
+    const eligible = selected.length === 1 && selected[0] !== 'all' && selected[0] !== 'no-person';
+    const person = eligible ? persons.find((item) => item.id === selected[0]) : null;
+    aliasInput.disabled = !eligible;
+    updateAliasBtn.disabled = !eligible;
+    aliasInput.value = person?.alias || '';
+}
+
+collapseLabelingBtn.addEventListener('click', () => labelingPanel.classList.add('collapsed'));
+expandLabelingBtn.addEventListener('click', () => labelingPanel.classList.remove('collapsed'));
+sourceUrlBtn.addEventListener('click', () => {
+    cloudUrlInput.value = sourceUrl;
+    showPage('generate');
+});
+personFilter.addEventListener('change', loadFilteredImages);
+clearLabelLogBtn.addEventListener('click', () => { labelLog.value = ''; });
+
+labelingBtn.addEventListener('click', async () => {
+    if (isProcessing) return;
+    isProcessing = true;
+    labelingBtn.disabled = true;
+    addLabelLog('Starting labeling...');
+    try {
+        const response = await fetch('/api/labeling', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not start labeling');
+        addLabelLog(`Job ID: ${data.jobId}`);
+        const poll = async () => {
+            const statusResponse = await fetch(`/api/job-status/${encodeURIComponent(data.jobId)}`);
+            const job = await statusResponse.json();
+            if (!statusResponse.ok) throw new Error(job.error || 'Could not check labeling status');
+            addLabelLog(`Job status: ${job.status}${job.progress ? ` (${job.progress}%)` : ''}`);
+            if (job.status === 'completed') {
+                addLabelLog('Labeling completed successfully');
+                labelingBtn.disabled = false;
+                isProcessing = false;
+                await loadGallery();
+                return;
+            }
+            if (job.status === 'failed') throw new Error(job.error || 'Labeling failed');
+            setTimeout(poll, 3000);
+        };
+        poll();
+    } catch (error) {
+        addLabelLog(`ERROR: ${error.message}`);
+        labelingBtn.disabled = false;
+        isProcessing = false;
+    }
+});
+
+updateAliasBtn.addEventListener('click', async () => {
+    const selected = [...personFilter.selectedOptions].map((option) => option.value);
+    if (selected.length !== 1 || selected[0] === 'all' || selected[0] === 'no-person') return;
+    try {
+        const response = await fetch('/api/person-aliases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [selected[0]]: aliasInput.value })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not update alias');
+        const person = persons.find((item) => item.id === selected[0]);
+        if (person) person.alias = aliasInput.value.trim();
+        personFilter.querySelector(`option[value="${CSS.escape(selected[0])}"]`).textContent = person.alias || person.id;
+        addLabelLog(`Alias updated for ${selected[0]}`);
+    } catch (error) {
+        addLabelLog(`ERROR: ${error.message}`);
+    }
+});
 
 function escapeHtml(text) {
     const div = document.createElement('div');
