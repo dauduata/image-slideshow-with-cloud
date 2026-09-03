@@ -14,6 +14,41 @@ const LABELED_FILE = path.join(ROOT, 'image-onedrive-links-labeled.js');
 const GENERATED_FILE = path.join(ROOT, 'FE', 'seriesData.js');
 const REPORT_FILE = path.join(ROOT, 'face-clusters-report.html');
 
+const jobManager = {
+    jobs: new Map(),
+    createJob() {
+        const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+        this.jobs.set(jobId, {
+            jobId,
+            status: 'processing',
+            progress: 0,
+            result: null,
+            error: null,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+        });
+        this.cleanupOldJobs();
+        return jobId;
+    },
+    getJob(jobId) { return this.jobs.get(jobId); },
+    updateJob(jobId, updates) {
+        const job = this.jobs.get(jobId);
+        if (job) Object.assign(job, updates, { updatedAt: Date.now() });
+    },
+    completeJob(jobId, result) {
+        this.updateJob(jobId, { status: 'completed', progress: 100, result });
+    },
+    failJob(jobId, error) {
+        this.updateJob(jobId, { status: 'failed', error: error.message || String(error) });
+    },
+    cleanupOldJobs() {
+        const maxAge = 24 * 60 * 60 * 1000;
+        for (const [jobId, job] of this.jobs) {
+            if (Date.now() - job.createdAt > maxAge) this.jobs.delete(jobId);
+        }
+    }
+};
+
 function json(response, status, value) {
     response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
     response.end(JSON.stringify(value));
@@ -115,6 +150,16 @@ function safeStaticFile(baseDirectory, relativePath) {
     return fileName;
 }
 
+function startExtractionJob(response, extractor, input) {
+    const jobId = jobManager.createJob();
+    json(response, 202, { jobId, status: 'processing', message: 'Image extraction job started' });
+    extractor(input.folderUrl, input.outputFile).then((output) => {
+        jobManager.completeJob(jobId, { output });
+    }).catch((error) => {
+        jobManager.failJob(jobId, error);
+    });
+}
+
 const server = http.createServer(async (request, response) => {
     try {
         const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
@@ -131,18 +176,25 @@ const server = http.createServer(async (request, response) => {
             await fs.writeFile(ALIASES_FILE, `${JSON.stringify(current, null, 2)}\n`);
             return json(response, 200, { ok: true, aliases: current });
         }
+        if (url.pathname.startsWith('/api/job-status/') && request.method === 'GET') {
+            const job = jobManager.getJob(url.pathname.slice('/api/job-status/'.length));
+            if (!job) return json(response, 404, { error: 'Job not found' });
+            return json(response, 200, job);
+        }
         if (url.pathname === '/api/generate-fe-data' && request.method === 'POST') return json(response, 200, await generateFeData());
         if (url.pathname === '/api/extract/google-drive' && request.method === 'POST') {
             const input = await body(request);
             if (typeof input.folderUrl !== 'string' || !input.folderUrl) throw new Error('folderUrl is required');
-            return json(response, 200, { output: await googleDrive.run(input.folderUrl, input.outputFile || 'image-links.js') });
+            return startExtractionJob(response, googleDrive.run, input);
         }
         if (url.pathname === '/api/extract/onedrive' && request.method === 'POST') {
             const input = await body(request);
             if (typeof input.folderUrl !== 'string' || !input.folderUrl) throw new Error('folderUrl is required');
-            return json(response, 200, { output: await oneDrive.run(input.folderUrl, input.outputFile || 'image-onedrive-links.js') });
+            return startExtractionJob(response, oneDrive.run, input);
         }
         if (url.pathname === '/' || url.pathname === '/index.html') return serveFile(response, path.join(ROOT, 'person-management', 'index.html'));
+        if (url.pathname === '/person-management' || url.pathname === '/person-management/') return serveFile(response, path.join(ROOT, 'person-management', 'index.html'));
+        if (url.pathname.startsWith('/person-management/')) return serveFile(response, safeStaticFile(path.join(ROOT, 'person-management'), url.pathname.slice('/person-management/'.length)));
         if (url.pathname === '/face-clusters-report/' || url.pathname === '/face-clusters-report') return serveFile(response, safeStaticFile(path.join(ROOT, 'face-clusters-report'), 'index.html'));
         if (url.pathname.startsWith('/face-clusters-report/')) return serveFile(response, safeStaticFile(path.join(ROOT, 'face-clusters-report'), url.pathname.slice('/face-clusters-report/'.length)));
         if (url.pathname === '/FE/seriesData.js') return serveFile(response, GENERATED_FILE);
