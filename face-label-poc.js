@@ -8,12 +8,11 @@ let ort;
 const ROOT = __dirname;
 const defaults = {
   input: path.join(ROOT, "image-xuatgiabedao-links.js"),
-  // input: path.join(ROOT, 'image-onedrive-links.js'),
-  output: path.join(ROOT, "image-onedrive-links-labeled.js"),
+  output: path.join(ROOT, "image-links-labeled.js"),
   report: path.join(ROOT, "face-clusters-report.html"),
   detector: path.join(ROOT, "models", "face_detection_yunet_2023mar.onnx"),
   recognizer: path.join(ROOT, "models", "face_recognition_sface_2021dec.onnx"),
-  concurrency: 2,
+  concurrency: 3,
   threshold: 0.45,
   timeout: 30000,
   minConfidence: 0.75,
