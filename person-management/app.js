@@ -52,6 +52,7 @@ let pollInFlight = false;
 let sourceUrl = '';
 let persons = [];
 let gallerySwiper = null;
+let cloudDataAvailable = false;
 
 // ============ LOGGING ============
 function addLog(message) {
@@ -141,7 +142,14 @@ openUrlBtn.addEventListener('click', () => {
 // ============ GENERATE BUTTON HANDLING ============
 generateBtn.addEventListener('click', async () => {
     const url = cloudUrlInput.value.trim();
-    
+
+    // Nếu cloudDataAvailable là true, thì hiển thị confirm dialog để hỏi người dùng có muốn tiếp tục hay không
+    if (cloudDataAvailable) {
+        if (!confirm('Gallery data is already available. Do you want to extract images again?')) {
+            return;
+        }
+    }
+
     if (!url) {
         addLog('ERROR: Please enter a cloud folder URL');
         return;
@@ -170,8 +178,8 @@ generateBtn.addEventListener('click', async () => {
     
     try {
         // Determine API endpoint based on cloud provider
-        const apiEndpoint = provider === CloudProvider.GOOGLE_DRIVE 
-            ? '/api/extract/google-drive' 
+        const apiEndpoint = provider === CloudProvider.GOOGLE_DRIVE
+            ? '/api/extract/google-drive'
             : '/api/extract/onedrive';
         
         addLog(`Calling API: ${apiEndpoint}`);
@@ -208,15 +216,22 @@ generateBtn.addEventListener('click', async () => {
 // ============ GALLERY DATA CHECKING ============
 async function checkGalleryData() {
     try {
-        const response = await fetch('/api/persons');
+        const response = await fetch('/api/image-data');
         const data = await response.json();
-        
-        if (response.ok && data.persons && data.persons.length > 0) {
+        cloudDataAvailable = response.ok && data.available;
+
+        if (response.ok && data.available) {
+            //fill the cloud-url with shareFolder if available
+            if (data.shareFolder) cloudUrlInput.value = data.shareFolder;
             goToGalleryBtn.disabled = false;
-            addLog(`✓ Gallery data is ready (${data.persons.length} people found)`);
+            addLog(`Gallery data is ready (${data.count} images found)`);
+            //mở page gallery nếu có dữ liệu
+            showPage('gallery');
+            await loadGallery();
         } else {
+            cloudUrlInput.value = '';
             goToGalleryBtn.disabled = true;
-            addLog('Gallery data: No labeled people found');
+            addLog('Gallery data: image-data.json has no images');
         }
     } catch (error) {
         goToGalleryBtn.disabled = true;
@@ -350,6 +365,13 @@ personFilter.addEventListener('change', loadFilteredImages);
 clearLabelLogBtn.addEventListener('click', () => { labelLog.value = ''; });
 
 labelingBtn.addEventListener('click', async () => {
+    // Nếu đã có persons thì show confirm dialog để hỏi người dùng có muốn tiếp tục hay không
+    if (persons.length > 0) {
+        if (!confirm('Labeling will overwrite existing labels. Do you want to continue?')) {
+            return;
+        }
+    }
+
     if (isProcessing) return;
     isProcessing = true;
     labelingBtn.disabled = true;
@@ -366,7 +388,7 @@ labelingBtn.addEventListener('click', async () => {
             const statusResponse = await fetch(`/api/job-status/${encodeURIComponent(data.jobId)}`);
             const job = await statusResponse.json();
             if (!statusResponse.ok) throw new Error(job.error || 'Could not check labeling status');
-            addLabelLog(`Job status: ${job.status}${job.progress ? ` (${job.progress}%)` : ''}`);
+            addLabelLog(`Job status: ${job.status} (${job.processedImages}/${job.totalImages} images, ${job.remainingImages} remaining${job.progress ? `, ${job.progress}%` : ''})`);
             if (job.status === 'completed') {
                 addLabelLog('Labeling completed successfully');
                 labelingBtn.disabled = false;
