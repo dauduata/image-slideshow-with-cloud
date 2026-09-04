@@ -10,23 +10,29 @@ const oneDrive = require('./extract/onedrive/service');
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
 const ALIASES_FILE = path.join(ROOT, 'data', 'person-aliases.json');
-const LABELED_FILE = path.join(ROOT, 'image-links-labeled.js');
 const GENERATED_FILE = path.join(ROOT, 'FE', 'seriesData.js');
 const REPORT_FILE = path.join(ROOT, 'face-clusters-report.html');
 const LABELING_OUTPUT_FILE = path.join(ROOT, 'image-links-labeled.js');
+const LABELED_FILE = LABELING_OUTPUT_FILE;
+const IMAGE_DATA_FILE = path.join(ROOT, 'data', 'image-data.json');
 
 const jobManager = {
     jobs: new Map(),
-    createJob() {
+    createJob(initialValues = {}) {
         const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         this.jobs.set(jobId, {
             jobId,
             status: 'processing',
             progress: 0,
+            totalImages: 0,
+            processedImages: 0,
+            remainingImages: 0,
+            failedImages: 0,
             result: null,
             error: null,
             createdAt: Date.now(),
-            updatedAt: Date.now()
+            updatedAt: Date.now(),
+            ...initialValues
         });
         this.cleanupOldJobs();
         return jobId;
@@ -37,7 +43,14 @@ const jobManager = {
         if (job) Object.assign(job, updates, { updatedAt: Date.now() });
     },
     completeJob(jobId, result) {
-        this.updateJob(jobId, { status: 'completed', progress: 100, result });
+        const job = this.getJob(jobId);
+        this.updateJob(jobId, {
+            status: 'completed',
+            progress: 100,
+            processedImages: job?.totalImages ?? job?.processedImages ?? 0,
+            remainingImages: 0,
+            result
+        });
     },
     failJob(jobId, error) {
         this.updateJob(jobId, { status: 'failed', error: error.message || String(error) });
@@ -72,8 +85,23 @@ function loadSeries(fileName) {
     return sandbox.__seriesData;
 }
 
-function runLabeling() {
+async function saveImageData(folderUrl, outputFile) {
+    const series = loadSeries(path.join(ROOT, outputFile));
+    const imageData = await readJson(IMAGE_DATA_FILE, {});
+    imageData.shareFolder = folderUrl;
+    imageData.data = series;
+    await fs.mkdir(path.dirname(IMAGE_DATA_FILE), { recursive: true });
+    await fs.writeFile(IMAGE_DATA_FILE, `${JSON.stringify(imageData, null, 2)}\n`, 'utf8');
+    return series.length;
+}
+
+function runLabeling(jobId) {
     const input = path.join(ROOT, 'image-links.js');
+    const totalImages = loadSeries(input).length;
+    jobManager.updateJob(jobId, {
+        totalImages,
+        remainingImages: totalImages
+    });
     return new Promise((resolve, reject) => {
         const child = require('node:child_process').spawn(process.execPath, [
             path.join(ROOT, 'face-label-poc.js'),
@@ -83,12 +111,41 @@ function runLabeling() {
         ], { cwd: ROOT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
         let output = '';
         let errorOutput = '';
-        child.stdout.on('data', (chunk) => { output += chunk; });
+        let pendingLine = '';
+        const processedIndexes = new Set();
+        let failedImages = 0;
+        const processOutputLine = (line) => {
+            if (line.trim() === 'SKIPPED') {
+                failedImages += 1;
+                jobManager.updateJob(jobId, { failedImages });
+                return;
+            }
+            const match = line.match(/^\[(\d+)\/(\d+)\]/);
+            if (!match || processedIndexes.has(match[1])) return;
+            processedIndexes.add(match[1]);
+            const processedImages = processedIndexes.size;
+            jobManager.updateJob(jobId, {
+                processedImages,
+                remainingImages: Math.max(0, totalImages - processedImages),
+                progress: totalImages
+                    ? Math.floor((processedImages / totalImages) * 100)
+                    : 100
+            });
+        };
+        child.stdout.on('data', (chunk) => {
+            output += chunk;
+            pendingLine += chunk.toString();
+            const lines = pendingLine.split(/\r?\n/);
+            pendingLine = lines.pop();
+            for (const line of lines) processOutputLine(line);
+        });
         child.stderr.on('data', (chunk) => { errorOutput += chunk; });
         child.on('error', reject);
-        child.on('close', (code) => code === 0
-            ? resolve({ output: output.trim(), file: LABELING_OUTPUT_FILE })
-            : reject(new Error((errorOutput || output || `Labeling exited with code ${code}`).trim())));
+        child.on('close', (code) => {
+            if (pendingLine) processOutputLine(pendingLine);
+            if (code === 0) resolve({ output: output.trim(), file: LABELING_OUTPUT_FILE });
+            else reject(new Error((errorOutput || output || `Labeling exited with code ${code}`).trim()));
+        });
     });
 }
 
@@ -182,20 +239,27 @@ function safeStaticFile(baseDirectory, relativePath) {
     return fileName;
 }
 
-function startExtractionJob(response, extractor, input) {
+function startExtractionJob(response, extractor, input, provider) {
     const jobId = jobManager.createJob();
     json(response, 202, { jobId, status: 'processing', message: 'Image extraction job started' });
-    extractor(input.folderUrl, input.outputFile).then((output) => {
-        jobManager.completeJob(jobId, { output });
+    extractor(input.folderUrl, input.outputFile).then(async (output) => {
+        const imageCount = await saveImageData(input.folderUrl, input.outputFile);
+        jobManager.completeJob(jobId, { output, imageCount, dataFile: 'data/image-data.json' });
     }).catch((error) => {
         jobManager.failJob(jobId, error);
     });
 }
 
+async function resetImageDataFile() {
+    await fs.writeFile(IMAGE_DATA_FILE, JSON.stringify({ shareFolder: "", data: [] }, null, 2));
+    await fs.writeFile(ALIASES_FILE, JSON.stringify({}), null, 2);
+}
+
 function startLabelingJob(response) {
-    const jobId = jobManager.createJob();
+    const totalImages = loadSeries(path.join(ROOT, 'image-links.js')).length;
+    const jobId = jobManager.createJob({ totalImages, remainingImages: totalImages });
     json(response, 202, { jobId, status: 'processing', message: 'Labeling job started' });
-    runLabeling().then((result) => {
+    runLabeling(jobId).then((result) => {
         jobManager.completeJob(jobId, result);
     }).catch((error) => {
         jobManager.failJob(jobId, error);
@@ -205,6 +269,17 @@ function startLabelingJob(response) {
 const server = http.createServer(async (request, response) => {
     try {
         const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+        if (url.pathname === '/api/image-data' && request.method === 'GET') {
+            const imageData = await readJson(IMAGE_DATA_FILE, {});
+            const images = Array.isArray(imageData.data) ? imageData.data : [];
+            // trả về thông tin url link và số lượng ảnh trong thư mục
+            return json(response, 200,
+                {
+                    available: images.length > 0,
+                    count: images.length,
+                    shareFolder: imageData.shareFolder || null
+                });
+        }
         if (url.pathname === '/api/persons' && request.method === 'GET') return json(response, 200, { persons: await getPersons() });
         if (url.pathname === '/api/images' && request.method === 'GET') return json(response, 200, { images: getImages(url.searchParams.getAll('person')) });
         if (url.pathname === '/api/person-aliases' && request.method === 'GET') return json(response, 200, await readJson(ALIASES_FILE, {}));
@@ -232,13 +307,15 @@ const server = http.createServer(async (request, response) => {
             const input = await body(request);
             if (typeof input.folderUrl !== 'string' || !input.folderUrl) throw new Error('folderUrl is required');
             input.outputFile = 'image-links.js';
-            return startExtractionJob(response, googleDrive.run, input);
+            await resetImageDataFile();
+            return startExtractionJob(response, googleDrive.run, input, 'google-drive');
         }
         if (url.pathname === '/api/extract/onedrive' && request.method === 'POST') {
             const input = await body(request);
             if (typeof input.folderUrl !== 'string' || !input.folderUrl) throw new Error('folderUrl is required');
             input.outputFile = input.outputFile || 'image-links.js';
-            return startExtractionJob(response, oneDrive.run, input);
+            await resetImageDataFile();
+            return startExtractionJob(response, oneDrive.run, input, 'onedrive');
         }
         if (url.pathname === '/' || url.pathname === '/index.html') return serveFile(response, path.join(ROOT, 'person-management', 'index.html'));
         if (url.pathname === '/person-management' || url.pathname === '/person-management/') return serveFile(response, path.join(ROOT, 'person-management', 'index.html'));
