@@ -10,7 +10,7 @@ const oneDrive = require('./extract/onedrive/service');
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
 const ALIASES_FILE = path.join(ROOT, 'data', 'person-aliases.json');
-const GENERATED_FILE = path.join(ROOT, 'FE', 'seriesData.js');
+const GENERATED_FILE = path.join(ROOT, 'FE', 'public', 'seriesData.js');
 const REPORT_FILE = path.join(ROOT, 'face-clusters-report.html');
 const LABELING_OUTPUT_FILE = path.join(ROOT, 'image-links-labeled.js');
 const LABELED_FILE = LABELING_OUTPUT_FILE;
@@ -30,6 +30,7 @@ const jobManager = {
             failedImages: 0,
             result: null,
             error: null,
+            logs: [],
             createdAt: Date.now(),
             updatedAt: Date.now(),
             ...initialValues
@@ -41,6 +42,11 @@ const jobManager = {
     updateJob(jobId, updates) {
         const job = this.jobs.get(jobId);
         if (job) Object.assign(job, updates, { updatedAt: Date.now() });
+    },
+    appendJobLog(jobId, message) {
+        const job = this.jobs.get(jobId);
+        if (job) job.logs.push(message);
+        this.updateJob(jobId, {});
     },
     completeJob(jobId, result) {
         const job = this.getJob(jobId);
@@ -163,6 +169,45 @@ function runLabeling(jobId) {
     });
 }
 
+function runWebsiteDeployment(jobId) {
+    return new Promise((resolve, reject) => {
+        const serviceAccountFile = path.join(ROOT, 'FE', 'firebase-danglephd.iptp.test.json');
+        let projectName = process.env.PUBLIC_WEBSITE_PROJECT || 'baoloc-summer-2026';
+        if (!projectName && fsSync.existsSync(serviceAccountFile)) {
+            projectName = JSON.parse(fsSync.readFileSync(serviceAccountFile, 'utf8')).project_id;
+        }
+        if (!projectName) return reject(new Error('Public website Firebase project is not configured'));
+
+        const child = require('node:child_process').spawn(process.execPath, [
+            path.join(ROOT, 'FE', 'deploy-website.js'),
+            projectName
+        ], { cwd: ROOT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+        const output = (chunk) => {
+            for (const line of chunk.toString().split(/\r?\n/).filter(Boolean)) {
+                jobManager.appendJobLog(jobId, line);
+            }
+        };
+        child.stdout.on('data', output);
+        child.stderr.on('data', output);
+        child.on('error', reject);
+        child.on('close', (code) => {
+            if (code === 0) {
+                resolve({
+                    project: projectName,
+                    url: `https://${projectName.toLowerCase()}.web.app/`
+                });
+            } else {
+                reject(new Error(`Website deployment exited with code ${code}`));
+            }
+        });
+    });
+}
+
+async function startWebsiteDeployment(jobId) {
+    jobManager.appendJobLog(jobId, 'Running FE/deploy-website.js...');
+    return runWebsiteDeployment(jobId);
+}
+
 async function ensureAliases(personIds) {
     const aliases = await readJson(ALIASES_FILE, {});
     let changed = false;
@@ -231,7 +276,7 @@ async function generateFeData() {
     const output = `const personAliases = ${JSON.stringify(Object.fromEntries(Object.entries(aliases).map(([id, value]) => [id, value.alias || ''])), null, 2)};\n\nconst seriesData = ${JSON.stringify(series, null, 2)};\n`;
     await fs.mkdir(path.dirname(GENERATED_FILE), { recursive: true });
     await fs.writeFile(GENERATED_FILE, output, 'utf8');
-    return { file: '/FE/seriesData.js', persons: personIdsFromSeries(series).length, images: series.length };
+    return { file: '/FE/public/seriesData.js', persons: personIdsFromSeries(series).length, images: series.length };
 }
 
 async function body(request) {
@@ -321,6 +366,16 @@ const server = http.createServer(async (request, response) => {
         }
         if (url.pathname === '/api/labeling' && request.method === 'POST') {
             return startLabelingJob(response);
+        }
+        if (url.pathname === '/api/deploy-website' && request.method === 'POST') {
+            const jobId = jobManager.createJob();
+            json(response, 202, { jobId, status: 'processing', message: 'Public website deployment started' });
+            startWebsiteDeployment(jobId).then((result) => {
+                jobManager.completeJob(jobId, result);
+            }).catch((error) => {
+                jobManager.failJob(jobId, error);
+            });
+            return;
         }
         if (url.pathname === '/api/generate-fe-data' && request.method === 'POST') return json(response, 200, await generateFeData());
         if (url.pathname === '/api/extract/google-drive' && request.method === 'POST') {
