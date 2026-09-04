@@ -222,7 +222,7 @@ async function checkGalleryData() {
 
         if (response.ok && data.available) {
             //fill the cloud-url with shareFolder if available
-            if (data.shareFolder) cloudUrlInput.value = data.shareFolder;
+            sourceUrl = data.shareFolder || '';
             goToGalleryBtn.disabled = false;
             addLog(`Gallery data is ready (${data.count} images found)`);
             //mở page gallery nếu có dữ liệu
