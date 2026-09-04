@@ -65,12 +65,94 @@ h1 {
   color: var(--muted);
 }
 
-#person-filter {
+.person-filter-control {
+  position: relative;
+  min-width: 180px;
+}
+
+.person-filter-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 36px;
   border: 1px solid var(--line);
   border-radius: 0;
   color: var(--ink);
   background: var(--panel);
-  padding: 8px 10px;
+  text-align: left;
+  font-weight: 400;
+}
+
+.person-filter-trigger:hover:not(:disabled),
+.person-filter-trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+}
+
+.person-filter-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.person-filter-trigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.person-filter-chevron {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform .15s ease;
+}
+
+.person-filter-trigger[aria-expanded="true"] .person-filter-chevron {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.person-filter-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+}
+
+.person-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  color: var(--ink);
+  cursor: pointer;
+  font: 13px ui-sans-serif, system-ui, sans-serif;
+}
+
+.person-filter-option:hover,
+.person-filter-option:focus-within {
+  background: rgba(255, 255, 255, .06);
+}
+
+.person-filter-option input {
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.person-filter-empty {
+  padding: 10px;
+  color: var(--muted);
   font: 13px ui-sans-serif, system-ui, sans-serif;
 }
 

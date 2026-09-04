@@ -20,10 +20,17 @@
     </header>
     <div class="filter-tools">
       <label for="person-filter">Person</label>
-      <select id="person-filter" multiple size="1">
+      <div class="person-filter-control">
+        <select id="person-filter" multiple hidden>
         <option value="all">All persons</option>
         <option value="no-person">No Person</option>
-      </select>
+        </select>
+        <button id="person-filter-trigger" type="button" class="person-filter-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="person-filter-menu">
+          <span id="person-filter-label">Select people...</span>
+          <span class="person-filter-chevron" aria-hidden="true"></span>
+        </button>
+        <div id="person-filter-menu" class="person-filter-menu" role="listbox" aria-multiselectable="true" aria-labelledby="person-filter-label" hidden></div>
+      </div>
     </div>
     <section class="gallery-shell" aria-label="Image gallery">
       <div class="gallery swiper" id="gallery">

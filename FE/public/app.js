@@ -9,6 +9,71 @@ const goToForm = document.querySelector('#go-to-form');
 const imageIndexInput = document.querySelector('#image-index');
 const goToCancel = document.querySelector('#go-to-cancel');
 const personFilter = document.querySelector('#person-filter');
+const personFilterTrigger = document.querySelector('#person-filter-trigger');
+const personFilterLabel = document.querySelector('#person-filter-label');
+const personFilterMenu = document.querySelector('#person-filter-menu');
+
+function syncPersonFilterUI() {
+  const options = [...personFilter.options];
+  const selected = options.filter((option) => option.selected);
+  personFilterLabel.textContent = selected.length === 0
+    ? 'Select people...'
+    : selected.length === 1
+      ? selected[0].textContent
+      : `${selected.length} people selected`;
+  personFilterMenu.replaceChildren();
+
+  if (!options.length) {
+    const empty = document.createElement('div');
+    empty.className = 'person-filter-empty';
+    empty.textContent = 'No people available';
+    personFilterMenu.append(empty);
+    return;
+  }
+
+  options.forEach((option) => {
+    const label = document.createElement('label');
+    label.className = 'person-filter-option';
+    label.setAttribute('role', 'option');
+    label.setAttribute('aria-selected', String(option.selected));
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = option.selected;
+    checkbox.tabIndex = -1;
+    checkbox.setAttribute('aria-label', option.textContent);
+    checkbox.addEventListener('change', () => {
+      option.selected = checkbox.checked;
+      personFilter.dispatchEvent(new Event('change', { bubbles: true }));
+      syncPersonFilterUI();
+    });
+    const text = document.createElement('span');
+    text.textContent = option.textContent;
+    label.append(checkbox, text);
+    personFilterMenu.append(label);
+  });
+}
+
+function setPersonFilterMenuOpen(isOpen) {
+  personFilterTrigger.setAttribute('aria-expanded', String(isOpen));
+  personFilterMenu.hidden = !isOpen;
+}
+
+personFilterTrigger.addEventListener('click', () => {
+  syncPersonFilterUI();
+  setPersonFilterMenuOpen(personFilterMenu.hidden);
+});
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.person-filter-control')) setPersonFilterMenuOpen(false);
+});
+
+personFilter.addEventListener('change', syncPersonFilterUI);
+new MutationObserver(syncPersonFilterUI).observe(personFilter, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ['selected', 'label', 'value']
+});
 
 function imageUrl(item, width = 2400) {
   let sourceUrl;
@@ -94,6 +159,7 @@ function populatePersonFilter(items) {
   const personIds = [...new Set(items.flatMap((item) => Array.isArray(item.persons) ? item.persons : []))].sort();
   personFilter.replaceChildren(new Option('All persons', 'all'), new Option('No Person', 'no-person'));
   personIds.forEach((personId) => personFilter.add(new Option(displayPerson(personId), personId)));
+  syncPersonFilterUI();
 }
 
 source

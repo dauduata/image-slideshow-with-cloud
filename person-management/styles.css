@@ -708,7 +708,6 @@ label {
 }
 
 input {
-    width: 100%;
     border: 1px solid var(--line);
     border-radius: 0;
     background: #0c0e0d;
