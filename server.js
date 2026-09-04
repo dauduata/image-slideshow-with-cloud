@@ -85,6 +85,20 @@ function loadSeries(fileName) {
     return sandbox.__seriesData;
 }
 
+function imageUrl(item, width = 2400) {
+    if (!item) return '';
+    if (item.thumbnailLink) return item.thumbnailLink.replace(/=s\d+$/, `=w${width}`);
+    if (item.thumbnailUrl) {
+        return item.thumbnailUrl
+            .replace(/([?&])width=\d+/, `$1width=${width}`)
+            .replace(/([?&])height=\d+/, `$1height=${width}`);
+    }
+    if (item.id && item.url?.includes('drive.google.com')) {
+        return `https://lh3.googleusercontent.com/d/${encodeURIComponent(item.id)}=w${width}`;
+    }
+    return item.url || '';
+}
+
 async function saveImageData(folderUrl, outputFile) {
     const series = loadSeries(path.join(ROOT, outputFile));
     const imageData = await readJson(IMAGE_DATA_FILE, {});
@@ -188,20 +202,26 @@ async function getPersons() {
         id,
         alias: aliases[id]?.alias || '',
         faceCount: details.get(id)?.faceCount || series.filter((record) => record.persons?.includes(id)).length,
-        representative: details.get(id)?.representative || series.find((record) => record.persons?.includes(id))?.thumbnailUrl || series.find((record) => record.persons?.includes(id))?.url || '',
-        images: series.filter((record) => record.persons?.includes(id)).map(({ name, url, thumbnailUrl }) => ({ name, url, thumbnailUrl: thumbnailUrl || url }))
+        representative: details.get(id)?.representative || imageUrl(series.find((record) => record.persons?.includes(id))),
+        images: series.filter((record) => record.persons?.includes(id)).map((record) => ({
+            name: record.name,
+            url: record.url,
+            thumbnailUrl: imageUrl(record)
+        }))
     }));
 }
 
 function getImages(selectedPersons) {
     const series = loadSeries(LABELED_FILE);
-    if (!selectedPersons.length || selectedPersons.includes('all')) return series;
-    return series.filter((record) => {
+    const filtered = !selectedPersons.length || selectedPersons.includes('all')
+        ? series
+        : series.filter((record) => {
         const persons = Array.isArray(record.persons) ? record.persons : [];
         return selectedPersons.some((person) => person === 'no-person'
             ? persons.length === 0
             : persons.includes(person));
-    });
+        });
+    return filtered.map((record) => ({ ...record, thumbnailUrl: imageUrl(record) }));
 }
 
 async function generateFeData() {

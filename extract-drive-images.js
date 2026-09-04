@@ -35,7 +35,7 @@ async function listImages(folderId, apiKey) {
       key: apiKey,
       q: `'${folderId}' in parents and trashed = false and mimeType contains 'image/'`,
       pageSize: String(PAGE_SIZE),
-      fields: 'nextPageToken,files(id,name,mimeType)'
+      fields: 'nextPageToken,files(id,name,mimeType,thumbnailLink)'
     });
 
     if (pageToken) {
@@ -81,7 +81,7 @@ async function main() {
   const seenIds = new Set();
   const images = [];
 
-  for (const { id, name } of files) {
+  for (const { id, name, thumbnailLink } of files) {
     if (seenIds.has(id)) {
       continue;
     }
@@ -90,7 +90,8 @@ async function main() {
     images.push({
       name,
       id,
-      url: `https://drive.google.com/uc?export=view&id=${id}`
+      url: `https://drive.google.com/uc?export=view&id=${id}`,
+      ...(thumbnailLink ? { thumbnailLink } : {})
     });
   }
 
