@@ -87,11 +87,12 @@ const source = driveConfig.apiKey && driveConfig.folderId
   : Promise.resolve(typeof seriesData === 'undefined' ? [] : seriesData);
 
 function displayPerson(personId) {
-  return window.personAliases?.[personId] || personId;
+  return (typeof personAliases !== 'undefined' && personAliases[personId]) || personId;
 }
 
 function populatePersonFilter(items) {
   const personIds = [...new Set(items.flatMap((item) => Array.isArray(item.persons) ? item.persons : []))].sort();
+  personFilter.replaceChildren(new Option('All persons', 'all'), new Option('No Person', 'no-person'));
   personIds.forEach((personId) => personFilter.add(new Option(displayPerson(personId), personId)));
 }
 
@@ -112,6 +113,7 @@ source
     const swiper = new Swiper(gallery, {
       virtual: {
         slides: images,
+        cache: false,
         addSlidesBefore: 3,
         addSlidesAfter: 3,
         renderSlide: (item, index) => renderSlide(item, index, images.length)
@@ -140,9 +142,15 @@ source
       }
     });
     personFilter.addEventListener('change', () => {
-      images = personFilter.value
-        ? allImages.filter((item) => item.persons?.includes(personFilter.value))
-        : allImages;
+      const selected = [...personFilter.selectedOptions].map((option) => option.value);
+      images = !selected.length || selected.includes('all')
+        ? allImages
+        : allImages.filter((item) => {
+          const persons = Array.isArray(item.persons) ? item.persons : [];
+          return selected.some((person) => person === 'no-person'
+            ? persons.length === 0
+            : persons.includes(person));
+        });
       swiper.virtual.slides = images;
       swiper.virtual.update(true);
       swiper.slideTo(0, 0);
