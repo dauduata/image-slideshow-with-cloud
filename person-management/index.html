@@ -73,7 +73,14 @@
                     </header>
                     <div class="gallery-controls">
                         <label for="person-filter">Person</label>
-                        <select id="person-filter" multiple size="1"></select>
+                        <div class="person-filter-control">
+                            <select id="person-filter" multiple hidden></select>
+                            <button id="person-filter-trigger" type="button" class="person-filter-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="person-filter-menu">
+                                <span id="person-filter-label">Select people...</span>
+                                <span class="person-filter-chevron" aria-hidden="true"></span>
+                            </button>
+                            <div id="person-filter-menu" class="person-filter-menu" role="listbox" aria-multiselectable="true" aria-labelledby="person-filter-label" hidden></div>
+                        </div>
                         <label for="alias-input">Alias</label>
                         <div class="alias-controls"><input id="alias-input" type="text" disabled><button id="update-alias-btn" type="button" disabled>Update</button></div>
                     </div>

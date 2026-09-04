@@ -400,7 +400,6 @@ button.small-btn {
     color: var(--muted);
 }
 
-#person-filter,
 #alias-input {
     width: 100%;
     min-width: 0;
@@ -412,38 +411,108 @@ button.small-btn {
     font: 13px ui-sans-serif, system-ui, sans-serif;
 }
 
-#person-filter {
-    color-scheme: dark;
+.person-filter-control {
+    position: relative;
+    min-width: 0;
 }
 
-#person-filter option {
+.person-filter-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: 37px;
+    overflow: hidden;
+    text-align: left;
+    font-weight: 400;
     color: var(--ink);
     background: var(--control);
 }
 
-#person-filter option:checked {
-    color: var(--accent-ink);
-    background: var(--accent);
-}
-
-#person-filter:hover,
-#alias-input:hover {
+.person-filter-trigger:hover:not(:disabled),
+.person-filter-trigger[aria-expanded="true"] {
     border-color: var(--accent);
     background: var(--control-hover);
 }
 
-#person-filter:focus,
+.person-filter-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+}
+
 #alias-input:focus {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
     border-color: var(--accent);
 }
 
-#person-filter:disabled,
 #alias-input:disabled {
     color: #b9beb4;
     background: #151916;
     border-color: #4b524c;
+}
+
+.person-filter-trigger > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.person-filter-chevron {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translateY(-2px);
+    transition: transform 0.15s ease;
+}
+
+.person-filter-trigger[aria-expanded="true"] .person-filter-chevron {
+    transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.person-filter-menu {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid #697266;
+    background: var(--control);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+}
+
+.person-filter-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 10px;
+    color: var(--ink);
+    cursor: pointer;
+    font: 13px ui-sans-serif, system-ui, sans-serif;
+}
+
+.person-filter-option:hover,
+.person-filter-option:focus-within {
+    background: var(--control-hover);
+}
+
+.person-filter-option input {
+    accent-color: var(--accent);
+    flex: 0 0 auto;
+}
+
+.person-filter-empty {
+    padding: 10px;
+    color: var(--muted);
+    font: 13px ui-sans-serif, system-ui, sans-serif;
 }
 
 .alias-controls {

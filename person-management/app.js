@@ -41,6 +41,9 @@ const publicWebsiteBtn = document.querySelector('#public-website-btn');
 const clearLabelLogBtn = document.querySelector('#clear-label-log-btn');
 const labelLog = document.querySelector('#label-log');
 const personFilter = document.querySelector('#person-filter');
+const personFilterTrigger = document.querySelector('#person-filter-trigger');
+const personFilterLabel = document.querySelector('#person-filter-label');
+const personFilterMenu = document.querySelector('#person-filter-menu');
 const aliasInput = document.querySelector('#alias-input');
 const updateAliasBtn = document.querySelector('#update-alias-btn');
 
@@ -53,6 +56,66 @@ let sourceUrl = '';
 let persons = [];
 let gallerySwiper = null;
 let cloudDataAvailable = false;
+
+function syncPersonFilterUI() {
+    const options = [...personFilter.options];
+    const selected = options.filter((option) => option.selected);
+    personFilterLabel.textContent = selected.length === 0
+        ? 'Select people...'
+        : selected.length === 1
+            ? selected[0].textContent
+            : `${selected.length} people selected`;
+    personFilterMenu.replaceChildren();
+
+    if (!options.length) {
+        const empty = document.createElement('div');
+        empty.className = 'person-filter-empty';
+        empty.textContent = 'No people available';
+        personFilterMenu.append(empty);
+        return;
+    }
+
+    options.forEach((option) => {
+        const label = document.createElement('label');
+        label.className = 'person-filter-option';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = option.selected;
+        checkbox.tabIndex = -1;
+        checkbox.setAttribute('aria-label', option.textContent);
+        checkbox.addEventListener('change', () => {
+            option.selected = checkbox.checked;
+            personFilter.dispatchEvent(new Event('change', { bubbles: true }));
+            syncPersonFilterUI();
+        });
+        const text = document.createElement('span');
+        text.textContent = option.textContent;
+        label.append(checkbox, text);
+        personFilterMenu.append(label);
+    });
+}
+
+function setPersonFilterMenuOpen(isOpen) {
+    personFilterTrigger.setAttribute('aria-expanded', String(isOpen));
+    personFilterMenu.hidden = !isOpen;
+}
+
+personFilterTrigger.addEventListener('click', () => {
+    syncPersonFilterUI();
+    setPersonFilterMenuOpen(personFilterMenu.hidden);
+});
+
+document.addEventListener('click', (event) => {
+    if (!event.target.closest('.person-filter-control')) setPersonFilterMenuOpen(false);
+});
+
+personFilter.addEventListener('change', syncPersonFilterUI);
+new MutationObserver(syncPersonFilterUI).observe(personFilter, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['selected', 'label', 'value']
+});
 
 // ============ LOGGING ============
 function addLog(message) {
@@ -265,6 +328,7 @@ async function loadGallery() {
         }
         personFilter.replaceChildren(new Option('All', 'all'), new Option('No Person', 'no-person'));
         persons.forEach((person) => personFilter.add(new Option(person.alias || person.id, person.id)));
+        syncPersonFilterUI();
         await loadFilteredImages();
     } catch (error) {
         galleryStatus.textContent = `Error: ${error.message}`;
