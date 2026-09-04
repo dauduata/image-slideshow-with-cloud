@@ -68,7 +68,7 @@ Default outputs:
 Useful options:
 
 ```powershell
-node face-label-poc.js --input image-onedrive-links.js --output image-onedrive-links-labeled.js --report face-clusters-report.html --concurrency 3 --threshold 0.45 --timeout 30000 --maxDimension 1600 --limit 200
+node face-label-poc.js --input image-links.js --output image-links-labeled.js --report  face-clusters-report.html --concurrency 3 --threshold 0.45 --timeout 30000 --maxDimension 1600 --limit 200
 ```
 
 Current detector defaults are `minConfidence=0.75`, `nmsThreshold=0.5`, `minFaceSize=20`, and `maxFaceAspectRatio=2.5`. Use `--name FILE.JPG --debug 1` to process one exact image and print decoded detector coordinates.
