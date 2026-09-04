@@ -11,7 +11,8 @@ const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
 const ALIASES_FILE = path.join(ROOT, 'data', 'person-aliases.json');
 const GENERATED_FILE = path.join(ROOT, 'FE', 'public', 'seriesData.js');
-const REPORT_FILE = path.join(ROOT, 'face-clusters-report.html');
+const REPORT_DIRECTORY = path.join(ROOT, 'report');
+const REPORT_FILE = path.join(REPORT_DIRECTORY, 'face-clusters-report.html');
 const LABELING_OUTPUT_FILE = path.join(ROOT, 'image-links-labeled.js');
 const LABELED_FILE = LABELING_OUTPUT_FILE;
 const IMAGE_DATA_FILE = path.join(ROOT, 'data', 'image-data.json');
@@ -399,6 +400,8 @@ const server = http.createServer(async (request, response) => {
         if (url.pathname === '/' || url.pathname === '/index.html') return serveFile(response, path.join(ROOT, 'person-management', 'index.html'));
         if (url.pathname === '/person-management' || url.pathname === '/person-management/') return serveFile(response, path.join(ROOT, 'person-management', 'index.html'));
         if (url.pathname.startsWith('/person-management/')) return serveFile(response, safeStaticFile(path.join(ROOT, 'person-management'), url.pathname.slice('/person-management/'.length)));
+        if (url.pathname === '/report/' || url.pathname === '/report') return serveFile(response, safeStaticFile(REPORT_DIRECTORY, 'face-clusters-report.html'));
+        if (url.pathname.startsWith('/report/')) return serveFile(response, safeStaticFile(REPORT_DIRECTORY, url.pathname.slice('/report/'.length)));
         if (url.pathname === '/face-clusters-report/' || url.pathname === '/face-clusters-report') return serveFile(response, safeStaticFile(path.join(ROOT, 'face-clusters-report'), 'index.html'));
         if (url.pathname.startsWith('/face-clusters-report/')) return serveFile(response, safeStaticFile(path.join(ROOT, 'face-clusters-report'), url.pathname.slice('/face-clusters-report/'.length)));
         if (url.pathname === '/FE/seriesData.js') return serveFile(response, GENERATED_FILE);

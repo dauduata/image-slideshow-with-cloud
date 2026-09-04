@@ -9,7 +9,8 @@ const ROOT = __dirname;
 const defaults = {
   input: path.join(ROOT, "image-xuatgiabedao-links.js"),
   output: path.join(ROOT, "image-links-labeled.js"),
-  report: path.join(ROOT, "face-clusters-report.html"),
+  clusterOutput: path.join(ROOT, "report", "image-links-clusters.js"),
+  report: path.join(ROOT, "report", "face-clusters-report.html"),
   detector: path.join(ROOT, "models", "face_detection_yunet_2023mar.onnx"),
   recognizer: path.join(ROOT, "models", "face_recognition_sface_2021dec.onnx"),
   concurrency: 3,
@@ -29,7 +30,7 @@ function parseArgs() {
     const argument = values[index];
     if (argument === "--help") {
       console.log(
-        "node face-label-poc.js [--input file] [--output file] [--report file] [--concurrency 2] [--threshold 0.45]",
+        "node face-label-poc.js [--input file] [--output file] [--cluster-output file] [--report file] [--concurrency 2] [--threshold 0.45]",
       );
       process.exit(0);
     }
@@ -50,6 +51,8 @@ function parseArgs() {
         ? Number(value)
         : value;
   }
+  // if (/\.html\.html$/i.test(options.report))
+  //   throw new Error("Invalid report path: use face-clusters-report.html, not .html.html");
   if (
     options.concurrency < 1 ||
     options.threshold <= 0 ||
@@ -391,27 +394,12 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       x: (point.x - detectorOffsetX) / detectorScale,
       y: (point.y - detectorOffsetY) / detectorScale,
     }));
-    const cropBefore = await sharp(resized.data, { raw: resized.info })
-      .extract({ left, top, width: boxWidth, height: boxHeight })
-      .resize(112, 112)
-      .raw()
-      .toBuffer();
     const aligned = sampleAligned(
       resized.data,
       width,
       height,
       similarityTransform(landmarks),
     );
-    const previewBefore = await sharp(cropBefore, {
-      raw: { width: 112, height: 112, channels: 3 },
-    })
-      .jpeg()
-      .toBuffer();
-    const previewAligned = await sharp(aligned, {
-      raw: { width: 112, height: 112, channels: 3 },
-    })
-      .jpeg()
-      .toBuffer();
     const result = await recognizer.run({
       [recognizer.inputNames[0]]: tensorFromRgb(aligned, 112, 112, true),
     });
@@ -434,32 +422,11 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       );
     faces.push({
       embedding: normalized,
-      preview: `data:image/jpeg;base64,${previewAligned.toString("base64")}`,
-      previewBefore: `data:image/jpeg;base64,${previewBefore.toString("base64")}`,
       landmarks,
       box: { left, top, width: boxWidth, height: boxHeight },
       confidence: detection.confidence,
     });
   }
-  const overlays = faces
-    .map(
-      (face) =>
-        `<rect x="${face.box.left}" y="${face.box.top}" width="${face.box.width}" height="${face.box.height}"/><g>${face.landmarks.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="8"/>`).join("")}</g>`,
-    )
-    .join("");
-  const annotated = await sharp(resized.data, { raw: resized.info })
-    .composite([
-      {
-        input: Buffer.from(
-          `<svg width="${width}" height="${height}"><style>rect,circle{fill:none;stroke:#00ff55;stroke-width:6}circle{fill:#ff3355}</style>${overlays}</svg>`,
-        ),
-      },
-    ])
-    .jpeg()
-    .toBuffer();
-  faces.forEach((face) => {
-    face.annotated = `data:image/jpeg;base64,${annotated.toString("base64")}`;
-  });
   return faces;
 }
 
@@ -608,40 +575,11 @@ function cluster(embeddings, imageIds, threshold) {
   return labels;
 }
 
-function escapeHtml(value) {
-  return String(value).replace(
-    /[&<>"']/g,
-    (character) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-      character
-      ],
-  );
-}
-
-function writeReport(series, faces, labels, names, fileName) {
-  const groups = new Map();
-  faces.forEach((face, index) => {
-    const label = labels[index];
-    const key = label >= 0 ? label : "noise";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(series[face.imageIndex]);
-  });
-  const imagePreviews = new Map();
-  faces.forEach((face) => imagePreviews.set(face.imageIndex, face.annotated));
-  const sections = [...groups.entries()]
-    .map(([label]) => {
-      const groupFaces = faces
-        .map((face, index) => ({ face, index }))
-        .filter(({ index }) =>
-          label === "noise" ? labels[index] < 0 : labels[index] === label,
-        );
-      const title = label === "noise" ? "noise / unassigned" : names.get(label);
-      return `<section><h2>${title} <small>${groupFaces.length} face(s)</small></h2>${[...new Set(groupFaces.map(({ face }) => face.imageIndex))].map((imageIndex) => `<img class="original" src="${imagePreviews.get(imageIndex)}"><p>${escapeHtml(series[imageIndex].name)}</p>`).join("")}<div class="grid">${groupFaces.map(({ face }) => `<figure><img src="${face.previewBefore}"><img src="${face.preview}"><figcaption>before / aligned 112x112<br>score ${face.confidence.toFixed(3)}<br>${face.box.left},${face.box.top},${face.box.width}x${face.box.height}<br>${face.landmarks.map((point) => `${point.x.toFixed(0)},${point.y.toFixed(0)}`).join(" | ")}</figcaption></figure>`).join("")}</div></section>`;
-    })
-    .join("\n");
+function writeReport(fileName) {
+  fs.mkdirSync(path.dirname(fileName), { recursive: true });
   fs.writeFileSync(
     fileName,
-    `<!doctype html><meta charset="utf-8"><title>Face clusters</title><style>body{font:16px system-ui;margin:24px;background:#f5f3ef;color:#242424}section{border-top:2px solid #242424;padding:12px 0 28px}.original{display:block;max-width:min(100%,900px);height:auto;margin:12px 0}.grid{display:flex;flex-wrap:wrap;gap:12px}figure{width:232px;margin:0}figure img{display:inline-block;width:112px;height:112px;object-fit:cover;background:#ddd;margin-right:4px}figcaption{font-size:11px;margin-top:4px;line-height:1.35}small{font-size:13px;font-weight:normal}</style>${sections}`,
+    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Face clusters</title><style>body{font:16px system-ui;margin:24px;background:#f5f3ef;color:#242424}section{border-top:2px solid #242424;padding:12px 0 28px}.original{display:block;max-width:min(100%,900px);height:auto;margin:12px 0}.grid{display:flex;flex-wrap:wrap;gap:12px}article{width:232px}article img{max-width:100%;height:auto}figcaption{font-size:11px;margin-top:4px;line-height:1.35}small{font-size:13px;font-weight:normal}</style><main id="report">Loading...</main><script src="image-links-clusters.js"></script><script>const escapeHtml=value=>String(value).replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));const groups=new Map();seriesData.forEach(record=>record.persons.forEach(person=>{if(!groups.has(person.id))groups.set(person.id,[]);groups.get(person.id).push({record,person})}));document.querySelector('#report').innerHTML=[...groups].map(([id,items])=>'<section><h2>'+escapeHtml(id)+' <small>'+items.length+' face(s)</small></h2>'+[...new Set(items.map(({record})=>record.name))].map(name=>{const item=items.find(({record})=>record.name===name);return '<img class="original" src="'+escapeHtml(item.record.url||item.record.thumbnailUrl||'')+'" loading="lazy"><p>'+escapeHtml(name)+'</p>'}).join('')+'<div class="grid">'+items.map(({person})=>'<article><figcaption>score '+Number(person.confidence).toFixed(3)+'<br>box '+person.box.left+','+person.box.top+','+person.box.width+'x'+person.box.height+'<br>landmarks '+person.landmarks.map(point=>point.x.toFixed(0)+','+point.y.toFixed(0)).join(' | ')+'</figcaption></article>').join('')+'</div></section>').join('')||'<p>No cluster data available.</p>';</script>`,
   );
 }
 
@@ -746,15 +684,35 @@ async function main() {
       ),
     ],
   }));
+  const clusterOutput = series.map((record, imageIndex) => ({
+    ...record,
+    persons: faces
+      .map((face, faceIndex) =>
+        face.imageIndex === imageIndex && labels[faceIndex] >= 0
+          ? {
+              id: names.get(labels[faceIndex]),
+              confidence: face.confidence,
+              box: face.box,
+              landmarks: face.landmarks,
+            }
+          : null,
+      )
+      .filter(Boolean),
+  }));
+  fs.mkdirSync(path.dirname(options.clusterOutput), { recursive: true });
   fs.writeFileSync(
     options.output,
     `const seriesData = ${JSON.stringify(output, null, 2)};\n`,
   );
-  writeReport(output, faces, labels, names, options.report);
+  fs.writeFileSync(
+    options.clusterOutput,
+    `const seriesData = ${JSON.stringify(clusterOutput, null, 2)};\n`,
+  );
+  writeReport(options.report);
   const elapsed = Date.now() - started;
   const withFaces = imageFaces.filter((items) => items.length).length;
   console.log(
-    `\n===== BENCHMARK =====\nPlatform: ${process.platform} ${os.release()}\nCPU: ${os.cpus()[0].model}\nRAM: ${Math.round(os.totalmem() / 1024 ** 3)} GB\nNode.js: ${process.version}\nModel: YuNet + SFace (ONNX Runtime CPU)\nImages: ${series.length}\nImages with faces: ${withFaces}\nFaces: ${faces.length}\nGroups: ${names.size}\nDetection + embedding: ${((elapsed - clusteringTime) / 1000).toFixed(1)} sec\nClustering: ${(clusteringTime / 1000).toFixed(1)} sec\nTotal: ${(elapsed / 1000).toFixed(1)} sec\nAverage: ${Math.round(elapsed / Math.max(1, series.length))} ms/image\nFailed images: ${failed.length}\nOutput: ${options.output}\nReport: ${options.report}\n=====================`,
+    `\n===== BENCHMARK =====\nPlatform: ${process.platform} ${os.release()}\nCPU: ${os.cpus()[0].model}\nRAM: ${Math.round(os.totalmem() / 1024 ** 3)} GB\nNode.js: ${process.version}\nModel: YuNet + SFace (ONNX Runtime CPU)\nImages: ${series.length}\nImages with faces: ${withFaces}\nFaces: ${faces.length}\nGroups: ${names.size}\nDetection + embedding: ${((elapsed - clusteringTime) / 1000).toFixed(1)} sec\nClustering: ${(clusteringTime / 1000).toFixed(1)} sec\nTotal: ${(elapsed / 1000).toFixed(1)} sec\nAverage: ${Math.round(elapsed / Math.max(1, series.length))} ms/image\nFailed images: ${failed.length}\nOutput: ${options.output}\nCluster output: ${options.clusterOutput}\nReport: ${options.report}\n=====================`,
   );
 }
 
