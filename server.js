@@ -322,6 +322,10 @@ async function resetImageDataFile() {
 
 function startLabelingJob(response) {
     const totalImages = loadSeries(path.join(ROOT, 'image-links.js')).length;
+    // reset person-aliases.json before starting labeling job
+    fs.writeFile(ALIASES_FILE, JSON.stringify({}, null, 2)).catch((error) => {
+        console.error(`Failed to reset ${ALIASES_FILE}: ${error.message}`);
+    });
     const jobId = jobManager.createJob({ totalImages, remainingImages: totalImages });
     json(response, 202, { jobId, status: 'processing', message: 'Labeling job started' });
     runLabeling(jobId).then((result) => {
