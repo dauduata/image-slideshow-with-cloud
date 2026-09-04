@@ -7,17 +7,17 @@ const CloudProvider = {
 
 function detectCloudProvider(url) {
     if (!url || typeof url !== 'string') return CloudProvider.UNKNOWN;
-    
+
     const urlLower = url.toLowerCase();
-    
+
     if (urlLower.includes('drive.google.com') || urlLower.includes('folder')) {
         return CloudProvider.GOOGLE_DRIVE;
     }
-    
+
     if (urlLower.includes('onedrive.live.com') || urlLower.includes('1drv.ms') || urlLower.includes('sharepoint')) {
         return CloudProvider.ONE_DRIVE;
     }
-    
+
     return CloudProvider.UNKNOWN;
 }
 
@@ -30,7 +30,6 @@ const generateBtn = document.querySelector('#generate-btn');
 const clearLogBtn = document.querySelector('#clear-log-btn');
 const jobLog = document.querySelector('#job-log');
 const goToGalleryBtn = document.querySelector('#go-to-gallery-btn');
-const backToGenerateBtn = document.querySelector('#back-to-generate-btn');
 const galleryContainer = document.querySelector('#gallery-container');
 let galleryStatus = document.querySelector('#gallery-status');
 const labelingPanel = document.querySelector('#labeling-panel');
@@ -38,6 +37,7 @@ const collapseLabelingBtn = document.querySelector('#collapse-labeling-btn');
 const expandLabelingBtn = document.querySelector('#expand-labeling-btn');
 const sourceUrlBtn = document.querySelector('#source-url-btn');
 const labelingBtn = document.querySelector('#labeling-btn');
+const publicWebsiteBtn = document.querySelector('#public-website-btn');
 const clearLabelLogBtn = document.querySelector('#clear-label-log-btn');
 const labelLog = document.querySelector('#label-log');
 const personFilter = document.querySelector('#person-filter');
@@ -120,7 +120,7 @@ function startJobPolling(jobId) {
 function showPage(page) {
     pageGenerate.style.display = 'none';
     pageGallery.style.display = 'none';
-    
+
     if (page === 'generate') {
         pageGenerate.style.display = 'block';
     } else if (page === 'gallery') {
@@ -135,7 +135,7 @@ openUrlBtn.addEventListener('click', () => {
         addLog('ERROR: Please enter a URL');
         return;
     }
-    
+
     window.open(url, '_blank', 'noopener,noreferrer');
 });
 
@@ -154,36 +154,36 @@ generateBtn.addEventListener('click', async () => {
         addLog('ERROR: Please enter a cloud folder URL');
         return;
     }
-    
+
     if (isProcessing) {
         addLog('ERROR: Already processing. Please wait...');
         return;
     }
-    
+
     // Detect cloud provider
     const provider = detectCloudProvider(url);
     if (provider === CloudProvider.UNKNOWN) {
         addLog('ERROR: URL must be a Google Drive or OneDrive shared folder URL');
         return;
     }
-    
+
     clearLog();
     addLog(`Cloud provider detected: ${provider === CloudProvider.GOOGLE_DRIVE ? 'Google Drive' : 'OneDrive'}`);
     addLog('Starting image extraction...');
-    
+
     // Disable button during processing
     isProcessing = true;
     generateBtn.disabled = true;
     stopJobPolling();
-    
+
     try {
         // Determine API endpoint based on cloud provider
         const apiEndpoint = provider === CloudProvider.GOOGLE_DRIVE
             ? '/api/extract/google-drive'
             : '/api/extract/onedrive';
-        
+
         addLog(`Calling API: ${apiEndpoint}`);
-        
+
         const response = await fetch(apiEndpoint, {
             method: 'POST',
             headers: {
@@ -191,9 +191,9 @@ generateBtn.addEventListener('click', async () => {
             },
             body: JSON.stringify({ folderUrl: url })
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             addLog(`ERROR: ${data.error || 'Failed to extract images'}`);
             isProcessing = false;
@@ -246,22 +246,18 @@ goToGalleryBtn.addEventListener('click', async () => {
     await loadGallery();
 });
 
-backToGenerateBtn.addEventListener('click', () => {
-    showPage('generate');
-});
-
 // ============ GALLERY LOADING ============
 async function loadGallery() {
     try {
         galleryStatus.textContent = 'Loading gallery...';
         const response = await fetch('/api/persons');
         const data = await response.json();
-        
+
         if (!response.ok) {
             galleryStatus.textContent = `Error: ${data.error || 'Failed to load gallery'}`;
             return;
         }
-        
+
         persons = data.persons || [];
         if (persons.length === 0) {
             galleryStatus.textContent = 'No images available. Generate images first.';
@@ -338,11 +334,12 @@ function renderGallery(images) {
 function renderGallerySlide(image, index, total) {
     const name = escapeHtml(image.name || `Image ${index + 1}`);
     const source = escapeHtml(image.thumbnailUrl || image.url || '');
+    const link = escapeHtml(image.url || image.thumbnailUrl || '#');
     return `<article class="swiper-slide gallery-cell">
+        <div class="caption"><a class="image-link" href="${link}" target="_blank" rel="noopener noreferrer">${name}</a><span>${String(index + 1).padStart(4, '0')} / ${String(total).padStart(4, '0')}</span></div>
         <div class="swiper-zoom-container">
             <img src="${source}" alt="${name}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
         </div>
-        <div class="caption"><span>${name}</span><span>${String(index + 1).padStart(4, '0')} / ${String(total).padStart(4, '0')}</span></div>
     </article>`;
 }
 
@@ -399,10 +396,57 @@ labelingBtn.addEventListener('click', async () => {
             if (job.status === 'failed') throw new Error(job.error || 'Labeling failed');
             setTimeout(poll, 3000);
         };
-        poll();
+        poll().catch((error) => {
+            addLabelLog(`ERROR: ${error.message}`);
+            labelingBtn.disabled = false;
+            isProcessing = false;
+        });
     } catch (error) {
         addLabelLog(`ERROR: ${error.message}`);
         labelingBtn.disabled = false;
+        isProcessing = false;
+    }
+});
+
+publicWebsiteBtn.addEventListener('click', async () => {
+    if (isProcessing) return;
+    isProcessing = true;
+    publicWebsiteBtn.disabled = true;
+    addLabelLog('Starting public website generation and deployment...');
+    try {
+        const generateResponse = await fetch('/api/generate-fe-data', { method: 'POST' });
+        const generated = await generateResponse.json();
+        if (!generateResponse.ok) throw new Error(generated.error || 'Could not generate website data');
+        addLabelLog(`Generated ${generated.images} images and ${generated.persons} persons.`);
+
+        const response = await fetch('/api/deploy-website', { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not start website deployment');
+        addLabelLog(`Job ID: ${data.jobId}`);
+        let displayedLogs = 0;
+        const poll = async () => {
+            const statusResponse = await fetch(`/api/job-status/${encodeURIComponent(data.jobId)}`);
+            const job = await statusResponse.json();
+            if (!statusResponse.ok) throw new Error(job.error || 'Could not check deployment status');
+            for (const message of (job.logs || []).slice(displayedLogs)) addLabelLog(message);
+            displayedLogs = (job.logs || []).length;
+            if (job.status === 'completed') {
+                addLabelLog(`Public Website deployed: ${job.result.url}`);
+                publicWebsiteBtn.disabled = false;
+                isProcessing = false;
+                return;
+            }
+            if (job.status === 'failed') throw new Error(job.error || 'Website deployment failed');
+            setTimeout(poll, 2000);
+        };
+        poll().catch((error) => {
+            addLabelLog(`ERROR: ${error.message}`);
+            publicWebsiteBtn.disabled = false;
+            isProcessing = false;
+        });
+    } catch (error) {
+        addLabelLog(`ERROR: ${error.message}`);
+        publicWebsiteBtn.disabled = false;
         isProcessing = false;
     }
 });
@@ -442,7 +486,7 @@ clearLogBtn.addEventListener('click', () => {
 function init() {
     showPage('generate');
     checkGalleryData();
-    
+
     addLog('Application started');
     addLog('Ready to extract images from cloud');
 }
