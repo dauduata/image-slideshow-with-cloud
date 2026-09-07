@@ -45,7 +45,7 @@ section {
     width: 100%;
     height: auto;
     pointer-events: none;
-    margin: 12px 0;
+    /* margin: 12px 0; */
 }
 
 .image-name {
