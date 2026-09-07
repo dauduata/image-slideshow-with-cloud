@@ -2,14 +2,22 @@ const imageCache = new Map();
 
 function buildGroups() {
     const groups = new Map();
+    let globalFaceIndex = 0;
 
     seriesData.forEach((record) => {
-        record.persons.forEach((person) => {
+        record.persons.forEach((person, imageFaceIndex) => {
+            const face = {
+                record,
+                person,
+                globalFaceIndex,
+                imageFaceIndex,
+            };
+            globalFaceIndex += 1;
             if (!groups.has(person.id)) {
                 groups.set(person.id, []);
             }
 
-            groups.get(person.id).push({ record, person });
+            groups.get(person.id).push(face);
         });
     });
 
@@ -53,13 +61,13 @@ function drawFaceAnnotations(canvas, image, record, people) {
     context.font = `${Math.max(18, Math.round(image.naturalWidth / 90))}px system-ui`;
     context.textBaseline = 'top';
 
-    people.forEach(({ person }) => {
+    people.forEach(({ person, globalFaceIndex }) => {
         const box = person.box;
         const left = box.left * scaleX;
         const top = box.top * scaleY;
         const width = box.width * scaleX;
         const height = box.height * scaleY;
-        const label = `${person.id} ${Number(person.confidence).toFixed(2)}`;
+        const label = `face #${globalFaceIndex} ${person.id} ${Number(person.confidence).toFixed(2)}`;
 
         context.strokeStyle = '#ff3b30';
         context.fillStyle = 'rgba(255, 59, 48, 0.18)';
@@ -165,10 +173,11 @@ function renderFaceCrop(canvas, record, person) {
         });
 }
 
-function createFaceCard(record, person) {
+function createFaceCard(record, face) {
     const article = document.createElement('article');
     const canvas = document.createElement('canvas');
     const caption = document.createElement('figcaption');
+    const person = face.person;
     const box = person.box;
     const landmarks = person.landmarks
         .map((point) => `${point.x.toFixed(0)},${point.y.toFixed(0)}`)
@@ -178,6 +187,8 @@ function createFaceCard(record, person) {
     canvas.width = 232;
     canvas.height = 232;
     caption.textContent = [
+        `face #${face.globalFaceIndex} | image face #${face.imageFaceIndex}`,
+        `cluster ${person.id}`,
         `score ${Number(person.confidence).toFixed(3)}`,
         `box ${box.left},${box.top},${box.width}x${box.height}`,
         `landmarks ${landmarks}`,
@@ -200,10 +211,10 @@ function createCluster(id, items) {
     heading.appendChild(count);
     grid.className = 'grid';
 
-    items.forEach(({ record, person }) => {
+    items.forEach(({ record, person, globalFaceIndex, imageFaceIndex }) => {
         if (!records.has(record.name)) records.set(record.name, []);
-        records.get(record.name).push({ record, person });
-        grid.appendChild(createFaceCard(record, person));
+        records.get(record.name).push({ record, person, globalFaceIndex, imageFaceIndex });
+        grid.appendChild(createFaceCard(record, { record, person, globalFaceIndex, imageFaceIndex }));
     });
 
     section.appendChild(heading);
