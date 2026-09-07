@@ -16,11 +16,21 @@ function buildGroups() {
     return groups;
 }
 
+function getImageUrl(record) {
+    if (record.id && record.url?.includes('drive.google.com')) {
+        return `https://lh3.googleusercontent.com/d/${encodeURIComponent(record.id)}=w2400`;
+    }
+    if (record.thumbnailLink) {
+        return record.thumbnailLink.replace(/=s\d+$/, '=w2400');
+    }
+    return record.thumbnailUrl || record.url || '';
+}
+
 function loadImage(url) {
     if (!imageCache.has(url)) {
         const promise = new Promise((resolve, reject) => {
             const image = new Image();
-            image.crossOrigin = 'anonymous';
+            image.referrerPolicy = 'no-referrer';
             image.onload = () => resolve(image);
             image.onerror = () => reject(new Error(`Unable to load ${url}`));
             image.src = url;
@@ -31,19 +41,65 @@ function loadImage(url) {
     return imageCache.get(url);
 }
 
-function createOriginalImage(record) {
+function drawFaceAnnotations(canvas, image, record, people) {
+    const processingSize = getFaceImageSize(record, people[0]);
+    const scaleX = image.naturalWidth / processingSize.width;
+    const scaleY = image.naturalHeight / processingSize.height;
+    const context = canvas.getContext('2d');
+
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    context.lineWidth = Math.max(3, Math.round(image.naturalWidth / 600));
+    context.font = `${Math.max(18, Math.round(image.naturalWidth / 90))}px system-ui`;
+    context.textBaseline = 'top';
+
+    people.forEach(({ person }) => {
+        const box = person.box;
+        const left = box.left * scaleX;
+        const top = box.top * scaleY;
+        const width = box.width * scaleX;
+        const height = box.height * scaleY;
+        const label = `${person.id} ${Number(person.confidence).toFixed(2)}`;
+
+        context.strokeStyle = '#ff3b30';
+        context.fillStyle = 'rgba(255, 59, 48, 0.18)';
+        context.strokeRect(left, top, width, height);
+        context.fillRect(left, top, width, height);
+
+        context.fillStyle = '#ff3b30';
+        context.fillText(label, left, Math.max(0, top - context.measureText(label).actualBoundingBoxAscent - 6));
+
+        context.fillStyle = '#00a8ff';
+        person.landmarks.forEach((point) => {
+            context.beginPath();
+            context.arc(point.x * scaleX, point.y * scaleY, context.lineWidth * 1.5, 0, Math.PI * 2);
+            context.fill();
+        });
+    });
+}
+
+function createOriginalImage(record, people) {
     const wrapper = document.createElement('div');
     const image = document.createElement('img');
+    const overlay = document.createElement('canvas');
     const name = document.createElement('p');
-    const url = record.url || record.thumbnailUrl || '';
+    const url = getImageUrl(record);
 
+    wrapper.className = 'original-image-wrapper';
     image.className = 'original';
     image.src = url;
     image.alt = record.name || '';
     image.loading = 'lazy';
+    image.referrerPolicy = 'no-referrer';
+    overlay.className = 'original-overlay';
+    overlay.setAttribute('aria-label', `Face annotations for ${record.name || 'image'}`);
     name.className = 'image-name';
     name.textContent = record.name || '';
-    wrapper.append(image, name);
+    wrapper.append(image, overlay, name);
+
+    loadImage(url)
+        .then((loadedImage) => drawFaceAnnotations(overlay, loadedImage, record, people))
+        .catch(() => overlay.setAttribute('aria-label', 'Face annotations unavailable'));
 
     return wrapper;
 }
@@ -56,7 +112,7 @@ function getFaceImageSize(record, person) {
 }
 
 function renderFaceCrop(canvas, record, person) {
-    const url = record.url || record.thumbnailUrl || '';
+    const url = getImageUrl(record);
     const processingSize = getFaceImageSize(record, person);
 
     if (!url || !processingSize.width || !processingSize.height) {
@@ -145,14 +201,13 @@ function createCluster(id, items) {
     grid.className = 'grid';
 
     items.forEach(({ record, person }) => {
-        if (!records.has(record.name)) {
-            records.set(record.name, record);
-        }
+        if (!records.has(record.name)) records.set(record.name, []);
+        records.get(record.name).push({ record, person });
         grid.appendChild(createFaceCard(record, person));
     });
 
     section.appendChild(heading);
-    records.forEach((record) => section.appendChild(createOriginalImage(record)));
+    records.forEach((items) => section.appendChild(createOriginalImage(items[0].record, items)));
     section.appendChild(grid);
     return section;
 }
