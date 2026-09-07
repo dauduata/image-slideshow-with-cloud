@@ -316,19 +316,19 @@ function averageLandmarkDistance(first, second) {
 }
 
 async function detectAndEmbed(buffer, detector, recognizer, options) {
-  const source = sharp(buffer).rotate();
-  const metadata = await source.metadata();
-  const scale = Math.min(
-    1,
-    options.maxDimension / Math.max(metadata.width || 1, metadata.height || 1),
-  );
-  const width = Math.max(1, Math.round((metadata.width || 1) * scale));
-  const height = Math.max(1, Math.round((metadata.height || 1) * scale));
-  const resized = await source
-    .resize(width, height)
+  const resized = await sharp(buffer)
+    .rotate()
+    .resize({
+      width: options.maxDimension,
+      height: options.maxDimension,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
+  const width = resized.info.width;
+  const height = resized.info.height;
   const detectorSize = 640;
   const detectorScale = Math.min(detectorSize / width, detectorSize / height);
   const detectorWidth = Math.round(width * detectorScale);
