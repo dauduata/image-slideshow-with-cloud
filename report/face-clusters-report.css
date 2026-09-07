@@ -1,0 +1,64 @@
+body {
+    font: 16px system-ui;
+    margin: 24px;
+    background: #f5f3ef;
+    color: #242424;
+}
+
+.report-header {
+    margin-bottom: 24px;
+}
+
+.report-header h1 {
+    margin: 0;
+}
+
+.report-header p {
+    margin: 4px 0 0;
+}
+
+section {
+    border-top: 2px solid #242424;
+    padding: 12px 0 28px;
+}
+
+.original {
+    display: block;
+    max-width: min(100%, 900px);
+    height: auto;
+    margin: 12px 0;
+}
+
+.image-name {
+    margin: 0 0 12px;
+}
+
+.grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+article {
+    width: 232px;
+}
+
+.face-crop {
+    display: block;
+    width: 232px;
+    height: 232px;
+    object-fit: contain;
+    background: #ddd;
+}
+
+figcaption {
+    font-size: 11px;
+    margin-top: 4px;
+    line-height: 1.35;
+    white-space: pre-line;
+}
+
+small {
+    font-size: 13px;
+    font-weight: normal;
+}

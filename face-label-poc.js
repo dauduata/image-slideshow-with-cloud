@@ -7,7 +7,7 @@ let ort;
 
 const ROOT = __dirname;
 const defaults = {
-  input: path.join(ROOT, "image-xuatgiabedao-links.js"),
+  input: path.join(ROOT, "image-links.js"),
   output: path.join(ROOT, "image-links-labeled.js"),
   clusterOutput: path.join(ROOT, "report", "image-links-clusters.js"),
   report: path.join(ROOT, "report", "face-clusters-report.html"),
@@ -369,12 +369,25 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     const right = Math.min(width, toSourceX(detection.right));
     const bottom = Math.min(height, toSourceY(detection.bottom));
 
-    // 🔴 [I] DEBUG LANDMARKS — CÓ CÔNG THỨC KHÁC
-    if (options.debug)
+    // 🔴 [I] DEBUG LANDMARKS
+    //     YuNet trả landmark trong hệ tọa độ 640x640.
+    //     Phải undo offset + scale giống hệt [J].
+    const landmarks = detection.landmarks.map((point) => ({
+        x: (point.x - detectorOffsetX) / detectorScale,
+        y: (point.y - detectorOffsetY) / detectorScale,
+    }));
+    if (options.debug) {
       console.log(
-        `DEBUG candidate score=${detection.confidence.toFixed(3)} box=${left},${top},${right - left}x${bottom - top} landmarks=${detection.landmarks
-          .map((point) => `${((point.x * width) / detectorSize).toFixed(0)},${((point.y * height) / detectorSize).toFixed(0)}`).join("|")}`,
+        `DEBUG candidate score=${detection.confidence.toFixed(3)} ` +
+        `box=${left},${top},${right - left}x${bottom - top} ` +
+        `landmarks=${landmarks
+          .map(
+            (point) =>
+              `${point.x.toFixed(1)},${point.y.toFixed(1)}`,
+          )
+          .join("|")}`,
       );
+    }
     if (options.debug)
       console.log(
         `DEBUG box score=${detection.confidence.toFixed(3)} x=${left},y=${top},w=${right - left},h=${bottom - top}`,
@@ -390,10 +403,6 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       continue;
 
     // 🔴 [J] LANDMARKS THỰC TẾ DÙNG CHO ALIGNMENT
-    const landmarks = detection.landmarks.map((point) => ({
-      x: (point.x - detectorOffsetX) / detectorScale,
-      y: (point.y - detectorOffsetY) / detectorScale,
-    }));
     const aligned = sampleAligned(
       resized.data,
       width,
@@ -405,11 +414,11 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     });
     const values = Array.from(result[recognizer.outputNames[0]].data);
     const length = Math.hypot(...values) || 1;
-    
+
     console.log(
       `[EMBEDDING] output=${recognizer.outputNames[0]} dim=${values.length}`,
     );
-    
+
     const normalized = values.map((value) => value / length);
 
     console.log(
@@ -423,11 +432,26 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     faces.push({
       embedding: normalized,
       landmarks,
-      box: { left, top, width: boxWidth, height: boxHeight },
+      box: {
+        left,
+        top,
+        width: boxWidth,
+        height: boxHeight
+      },
+
+      // Needed by the report to map the box
+      // from the resized image back to the original image.
+      imageWidth: width,
+      imageHeight: height,
+
       confidence: detection.confidence,
     });
   }
-  return faces;
+  return {
+    width,
+    height,
+    faces,
+  };
 }
 
 function cosineDistance(first, second) {
@@ -618,14 +642,15 @@ async function main() {
       if (index >= series.length) return;
       try {
         const image = await fetchRecordImage(series[index], options.timeout);
-        imageFaces[index] = await detectAndEmbed(
+        const result = await detectAndEmbed(
           image.buffer,
           detector,
           recognizer,
           options,
         );
+        imageFaces[index] = result;
         console.log(
-          `[${index + 1}/${series.length}] ${series[index].name} faces: ${imageFaces[index].length} source: ${image.source}`,
+          `[${index + 1}/${series.length}] ${series[index].name} faces: ${imageFaces[index].faces.length} source: ${image.source}`,
         );
       } catch (error) {
         failed.push(index);
@@ -641,10 +666,20 @@ async function main() {
       worker,
     ),
   );
+
   const faces = [];
-  imageFaces.forEach((items, imageIndex) =>
-    items.forEach((face) => faces.push({ imageIndex, ...face })),
-  );
+
+  imageFaces.forEach((result, imageIndex) => {
+    result.faces.forEach((face) => {
+      faces.push({
+        imageIndex,
+        imageWidth: result.width,
+        imageHeight: result.height,
+        ...face,
+      });
+    });
+  });
+
   if (options.debug)
     for (let first = 0; first < faces.length; first += 1)
       for (let second = first + 1; second < faces.length; second += 1)
@@ -670,6 +705,7 @@ async function main() {
         `DEBUG face-${index + 1} => ${label >= 0 ? names.get(label) : "noise"}`,
       ),
     );
+
   const output = series.map((record, imageIndex) => ({
     ...record,
     persons: [
@@ -684,22 +720,36 @@ async function main() {
       ),
     ],
   }));
+
   const clusterOutput = series.map((record, imageIndex) => ({
     ...record,
+    faceImageSize: imageFaces[imageIndex] && imageFaces[imageIndex].faces.length
+      ? {
+        width: imageFaces[imageIndex].width,
+        height: imageFaces[imageIndex].height,
+      }
+      : undefined,
     persons: faces
       .map((face, faceIndex) =>
         face.imageIndex === imageIndex && labels[faceIndex] >= 0
           ? {
-              id: names.get(labels[faceIndex]),
-              confidence: face.confidence,
-              box: face.box,
-              landmarks: face.landmarks,
-            }
+            id: names.get(labels[faceIndex]),
+            confidence: face.confidence,
+            box: face.box,
+            landmarks: face.landmarks,
+
+          }
           : null,
       )
       .filter(Boolean),
   }));
+
+  // Make sure output directory exists.
+  fs.mkdirSync(path.dirname(options.output), { recursive: true });
   fs.mkdirSync(path.dirname(options.clusterOutput), { recursive: true });
+
+  // DATA files only.
+  // These are generated on every run.
   fs.writeFileSync(
     options.output,
     `const seriesData = ${JSON.stringify(output, null, 2)};\n`,
@@ -708,11 +758,34 @@ async function main() {
     options.clusterOutput,
     `const seriesData = ${JSON.stringify(clusterOutput, null, 2)};\n`,
   );
-  writeReport(options.report);
+
+  // Report HTML/JS are fixed files.
+  // main() does NOT generate them.
+  // writeReport(options.report);
+
   const elapsed = Date.now() - started;
   const withFaces = imageFaces.filter((items) => items.length).length;
+
   console.log(
-    `\n===== BENCHMARK =====\nPlatform: ${process.platform} ${os.release()}\nCPU: ${os.cpus()[0].model}\nRAM: ${Math.round(os.totalmem() / 1024 ** 3)} GB\nNode.js: ${process.version}\nModel: YuNet + SFace (ONNX Runtime CPU)\nImages: ${series.length}\nImages with faces: ${withFaces}\nFaces: ${faces.length}\nGroups: ${names.size}\nDetection + embedding: ${((elapsed - clusteringTime) / 1000).toFixed(1)} sec\nClustering: ${(clusteringTime / 1000).toFixed(1)} sec\nTotal: ${(elapsed / 1000).toFixed(1)} sec\nAverage: ${Math.round(elapsed / Math.max(1, series.length))} ms/image\nFailed images: ${failed.length}\nOutput: ${options.output}\nCluster output: ${options.clusterOutput}\nReport: ${options.report}\n=====================`,
+    `\n===== BENCHMARK =====
+  Platform: ${process.platform} ${os.release()}
+  CPU: ${os.cpus()[0].model}
+  RAM: ${Math.round(os.totalmem() / 1024 ** 3)} GB
+  Node.js: ${process.version}
+  Model: YuNet + SFace (ONNX Runtime CPU)
+  Images: ${series.length}
+  Images with faces: ${withFaces}
+  Faces: ${faces.length}
+  Groups: ${names.size}
+  Detection + embedding: ${((elapsed - clusteringTime) / 1000).toFixed(1)} sec
+  Clustering: ${(clusteringTime / 1000).toFixed(1)} sec
+  Total: ${(elapsed / 1000).toFixed(1)} sec
+  Average: ${Math.round(elapsed / Math.max(1, series.length))} ms/image
+  Failed images: ${failed.length}
+  Output: ${options.output}
+  Cluster output: ${options.clusterOutput}
+  Report: ${options.report}
+  =====================`,
   );
 }
 
