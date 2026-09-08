@@ -785,7 +785,7 @@ async function main() {
     ort.InferenceSession.create(options.detector),
     ort.InferenceSession.create(options.recognizer),
   ]);
-  const imageFaces = Array.from({ length: series.length }, () => []);
+  const imageFaces = Array.from({ length: series.length }, () => null);
   const failed = [];
   let next = 0;
   const started = Date.now();
@@ -823,6 +823,7 @@ async function main() {
   const faces = [];
 
   imageFaces.forEach((result, imageIndex) => {
+    if (!result) return;
     result.faces.forEach((face) => {
       faces.push({
         imageIndex,
@@ -994,7 +995,9 @@ async function main() {
   // writeReport(options.report);
 
   const elapsed = Date.now() - started;
-  const withFaces = imageFaces.filter((items) => items.length).length;
+  const withFaces = imageFaces.filter(
+    (result) => result && result.faces.length > 0,
+  ).length;
 
   console.log(
     `\n===== BENCHMARK =====
