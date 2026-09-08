@@ -100,8 +100,17 @@ function drawFaceAnnotations(canvas, image, record, people) {
         context.strokeRect(left, top, width, height);
         context.fillRect(left, top, width, height);
 
+        const labelMetrics = context.measureText(label);
+        const labelPadding = Math.max(4, Math.round(context.lineWidth));
+        const labelWidth = labelMetrics.width + labelPadding * 2;
+        const labelHeight = Math.max(24, Math.round(context.font.match(/\d+/)?.[0] || 18) + labelPadding * 2);
+        const labelX = left;
+        const labelY = Math.max(0, top - labelHeight - labelPadding);
+
+        context.fillStyle = '#ffffff';
+        context.fillRect(labelX, labelY, labelWidth, labelHeight);
         context.fillStyle = '#ff3b30';
-        context.fillText(label, left, Math.max(0, top - context.measureText(label).actualBoundingBoxAscent - 6));
+        context.fillText(label, labelX + labelPadding, labelY + labelPadding);
 
         person.landmarks.forEach((point, landmarkIndex) => {
             const landmarkStyle = landmarkStyles[landmarkIndex] || {
