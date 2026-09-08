@@ -94,14 +94,14 @@ function loadSeries(fileName) {
 
 function imageUrl(item, width = 2400) {
     if (!item) return '';
+    if (item.id && item.url?.includes('drive.google.com')) {
+        return `https://lh3.googleusercontent.com/d/${encodeURIComponent(item.id)}=w${width}`;
+    }
     if (item.thumbnailLink) return item.thumbnailLink.replace(/=s\d+$/, `=w${width}`);
     if (item.thumbnailUrl) {
         return item.thumbnailUrl
             .replace(/([?&])width=\d+/, `$1width=${width}`)
             .replace(/([?&])height=\d+/, `$1height=${width}`);
-    }
-    if (item.id && item.url?.includes('drive.google.com')) {
-        return `https://lh3.googleusercontent.com/d/${encodeURIComponent(item.id)}=w${width}`;
     }
     return item.url || '';
 }
