@@ -1,5 +1,31 @@
 const imageCache = new Map();
 
+const landmarkStyles = [
+    { name: 'Left eye', color: '#2563eb' },
+    { name: 'Right eye', color: '#16a34a' },
+    { name: 'Nose', color: '#f4ebdd' },
+    { name: 'Left mouth corner', color: '#dc2626' },
+    { name: 'Right mouth corner', color: '#9333ea' },
+];
+
+function createLandmarkLegend() {
+    const legend = document.createElement('div');
+    legend.className = 'landmark-legend';
+    legend.setAttribute('aria-label', 'Landmark color legend');
+
+    landmarkStyles.forEach(({ name, color }) => {
+        const item = document.createElement('span');
+        const swatch = document.createElement('span');
+        swatch.className = 'landmark-swatch';
+        swatch.style.backgroundColor = color;
+        swatch.setAttribute('aria-hidden', 'true');
+        item.append(swatch, document.createTextNode(name));
+        legend.append(item);
+    });
+
+    return legend;
+}
+
 function buildGroups() {
     const groups = new Map();
     let globalFaceIndex = 0;
@@ -77,8 +103,11 @@ function drawFaceAnnotations(canvas, image, record, people) {
         context.fillStyle = '#ff3b30';
         context.fillText(label, left, Math.max(0, top - context.measureText(label).actualBoundingBoxAscent - 6));
 
-        context.fillStyle = '#00a8ff';
-        person.landmarks.forEach((point) => {
+        person.landmarks.forEach((point, landmarkIndex) => {
+            const landmarkStyle = landmarkStyles[landmarkIndex] || {
+                color: '#64748b',
+            };
+            context.fillStyle = landmarkStyle.color;
             context.beginPath();
             context.arc(point.x * scaleX, point.y * scaleY, context.lineWidth * 1.5, 0, Math.PI * 2);
             context.fill();
@@ -227,6 +256,11 @@ function renderReport() {
     const clusters = document.getElementById('clusters');
     const status = document.getElementById('report-status');
     const groups = buildGroups();
+
+    document.getElementById('report').insertBefore(
+        createLandmarkLegend(),
+        clusters,
+    );
 
     groups.forEach((items, id) => {
         clusters.appendChild(createCluster(id, items));
