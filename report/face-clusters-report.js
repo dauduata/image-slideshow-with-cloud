@@ -256,28 +256,116 @@ function createCluster(id, items) {
     });
 
     section.appendChild(heading);
-    records.forEach((items) => section.appendChild(createOriginalImage(items[0].record, items)));
     section.appendChild(grid);
+    records.forEach((items) => section.appendChild(createOriginalImage(items[0].record, items)));
     return section;
+}
+
+function setupPersonFilter(groups, render) {
+    const select = document.getElementById('person-filter');
+    const trigger = document.getElementById('person-filter-trigger');
+    const label = document.getElementById('person-filter-label');
+    const menu = document.getElementById('person-filter-menu');
+    const ids = [...groups.keys()];
+
+    ids.forEach((id) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = id;
+        option.selected = ids.indexOf(id) === 0;
+        select.append(option);
+    });
+
+    const sync = () => {
+        const selected = [...select.options].filter((option) => option.selected);
+        label.textContent = selected.length === 0
+            ? 'No person selected'
+            : selected[0].textContent;
+        menu.replaceChildren();
+
+        if (!select.options.length) {
+            const empty = document.createElement('div');
+            empty.className = 'person-filter-empty';
+            empty.textContent = 'No people available';
+            menu.append(empty);
+            return;
+        }
+
+        [...select.options].forEach((option) => {
+            const item = document.createElement('label');
+            const checkbox = document.createElement('input');
+            const text = document.createElement('span');
+
+            item.className = 'person-filter-option';
+            checkbox.type = 'radio';
+            checkbox.name = 'person-filter-option';
+            checkbox.checked = option.selected;
+            checkbox.setAttribute('aria-label', option.textContent);
+            checkbox.addEventListener('change', () => {
+                [...select.options].forEach((itemOption) => {
+                    itemOption.selected = itemOption === option;
+                });
+                option.selected = checkbox.checked;
+                render();
+                sync();
+            });
+            text.textContent = option.textContent;
+            item.append(checkbox, text);
+            menu.append(item);
+        });
+    };
+
+    const setOpen = (isOpen) => {
+        trigger.setAttribute('aria-expanded', String(isOpen));
+        menu.hidden = !isOpen;
+    };
+
+    trigger.addEventListener('click', () => {
+        sync();
+        setOpen(menu.hidden);
+    });
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.person-filter-control')) setOpen(false);
+    });
+
+    return {
+        getSelected: () => new Set(
+            [...select.options]
+                .filter((option) => option.selected)
+                .map((option) => option.value),
+        ),
+        sync,
+    };
 }
 
 function renderReport() {
     const clusters = document.getElementById('clusters');
     const status = document.getElementById('report-status');
     const groups = buildGroups();
+    let personFilter;
 
-    document.getElementById('report').insertBefore(
-        createLandmarkLegend(),
-        clusters,
-    );
+    // document.getElementById('report').insertBefore(
+    //     createLandmarkLegend(),
+    //     clusters,
+    // );
 
-    groups.forEach((items, id) => {
-        clusters.appendChild(createCluster(id, items));
-    });
+    const render = () => {
+        const selected = personFilter ? personFilter.getSelected() : new Set();
+        const visibleGroups = [...groups.entries()]
+            .filter(([id]) => selected.size === 0 || selected.has(id));
 
-    status.textContent = groups.size
-        ? `${groups.size} cluster(s)`
-        : 'No cluster data available.';
+        clusters.replaceChildren();
+        visibleGroups.forEach(([id, items]) => {
+            clusters.appendChild(createCluster(id, items));
+        });
+        status.textContent = visibleGroups.length
+            ? `${visibleGroups.length} of ${groups.size} cluster(s)`
+            : 'No matching people.';
+    };
+
+    personFilter = setupPersonFilter(groups, render);
+    personFilter.sync();
+    render();
 }
 
 renderReport();

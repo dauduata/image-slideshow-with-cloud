@@ -13,6 +13,15 @@
         <div class="report-header">
             <h1>Face Clusters</h1>
             <p id="report-status">Loading...</p>
+            <div class="person-filter-control">
+                <label for="person-filter">Person</label>
+                <select id="person-filter" hidden></select>
+                <button id="person-filter-trigger" type="button" class="person-filter-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="person-filter-menu">
+                    <span id="person-filter-label">Select person...</span>
+                    <span class="person-filter-chevron" aria-hidden="true"></span>
+                </button>
+                <div id="person-filter-menu" class="person-filter-menu" role="radiogroup" aria-labelledby="person-filter-label" hidden></div>
+            </div>
         </div>
         <div id="clusters"></div>
     </main>
