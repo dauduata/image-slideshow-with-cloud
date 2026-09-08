@@ -434,12 +434,6 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       continue;
 
     // 🔴 [J] LANDMARKS THỰC TẾ DÙNG CHO ALIGNMENT
-    const aligned = sampleAligned(
-      resized.data,
-      width,
-      height,
-      similarityTransform(landmarks),
-    );
     const transformA = similarityTransformForOrder(
       landmarks,
       CURRENT_LANDMARK_ORDER,
@@ -448,9 +442,9 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       landmarks,
       ALTERNATIVE_LANDMARK_ORDER,
     );
+    const alignedA = sampleAligned(resized.data, width, height, transformA);
     const alignedB = sampleAligned(resized.data, width, height, transformB);
-    const sfaceTensor = tensorFromRgb(aligned, 112, 112, false, false);
-    const sfaceTensorB = tensorFromRgb(alignedB, 112, 112, false, false);
+    const sfaceTensor = tensorFromRgb(alignedB, 112, 112, false, false);
     if (options.debug) {
       console.log(
         `[SFACE INPUT] mode=BGR_RAW_0_255 shape=${sfaceTensor.dims.join("x")} ` +
@@ -463,7 +457,7 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       [recognizer.inputNames[0]]: sfaceTensor,
     });
     const resultB = await recognizer.run({
-      [recognizer.inputNames[0]]: sfaceTensorB,
+      [recognizer.inputNames[0]]: tensorFromRgb(alignedA, 112, 112, false, false),
     });
     const values = Array.from(result[recognizer.outputNames[0]].data);
     const valuesB = Array.from(resultB[recognizer.outputNames[0]].data);
@@ -504,25 +498,29 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       );
       console.log(
         `[FORENSIC HASH] face=${faces.length} ` +
-        `alignedA=${sha256(aligned)} alignedB=${sha256(alignedB)} ` +
-        `tensorA=${sha256(sfaceTensor.data)} tensorB=${sha256(sfaceTensorB.data)} ` +
-        `rawA=${sha256(Float32Array.from(values))} rawB=${sha256(Float32Array.from(valuesB))} ` +
-        `normalizedA=${sha256(Float32Array.from(normalized))} normalizedB=${sha256(Float32Array.from(normalizedB))}`,
+        `alignedA=${sha256(alignedA)} alignedB=${sha256(alignedB)} ` +
+        `tensorA=${sha256(tensorFromRgb(alignedA, 112, 112, false, false).data)} tensorB=${sha256(sfaceTensor.data)} ` +
+        `rawA=${sha256(Float32Array.from(valuesB))} rawB=${sha256(Float32Array.from(values))} ` +
+        `normalizedA=${sha256(Float32Array.from(normalizedB))} normalizedB=${sha256(Float32Array.from(normalized))}`,
       );
       console.log(
         `[FORENSIC EMBEDDING] face=${faces.length} ` +
-        `A-norm-before=${length.toFixed(6)} A-norm-after=${Math.hypot(...normalized).toFixed(6)} ` +
-        `B-norm-before=${lengthB.toFixed(6)} B-norm-after=${Math.hypot(...normalizedB).toFixed(6)}`,
+        `B-norm-before=${length.toFixed(6)} B-norm-after=${Math.hypot(...normalized).toFixed(6)} ` +
+        `A-norm-before=${lengthB.toFixed(6)} A-norm-after=${Math.hypot(...normalizedB).toFixed(6)}`,
       );
     }
 
     if (options.debug)
       console.log(
-        `DEBUG landmarks=${landmarks.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" | ")} cropBefore=${boxWidth}x${boxHeight} aligned=112x112`,
+        `DEBUG landmarks=${landmarks.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" | ")} cropBefore=${boxWidth}x${boxHeight} aligned=B 112x112`,
       );
+    const errorsA = alignmentErrors(landmarks, CURRENT_LANDMARK_ORDER, transformA);
+    const errorsB = alignmentErrors(landmarks, ALTERNATIVE_LANDMARK_ORDER, transformB);
     faces.push({
       embedding: normalized,
       alternativeEmbedding: normalizedB,
+      alignmentErrorsA: errorsA,
+      alignmentErrorsB: errorsB,
       landmarks,
       box: {
         left,
@@ -835,6 +833,39 @@ async function main() {
     });
   });
 
+  if (options.debug) {
+    const suspiciousPairs = [
+      [6, 10],
+      [5, 6],
+      [5, 10],
+      [0, 2],
+      [0, 10],
+      [0, 6],
+    ];
+    console.log("[ALIGNMENT DISTANCE SUMMARY] production=B, alternative=A");
+    suspiciousPairs.forEach(([first, second]) => {
+      if (!faces[first] || !faces[second]) {
+        console.log(`[ALIGNMENT DISTANCE] pair=${first},${second} unavailable`);
+        return;
+      }
+      const firstFace = faces[first];
+      const secondFace = faces[second];
+      const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+      const max = (values) => Math.max(...values);
+      console.log(
+        `[ALIGNMENT DISTANCE] pair=${first},${second} ` +
+        `production(B-B)=${cosineDistance(firstFace.embedding, secondFace.embedding).toFixed(6)} ` +
+        `alternative(A-A)=${cosineDistance(firstFace.alternativeEmbedding, secondFace.alternativeEmbedding).toFixed(6)} ` +
+        `B-A=${cosineDistance(firstFace.embedding, secondFace.alternativeEmbedding).toFixed(6)} ` +
+        `A-B=${cosineDistance(firstFace.alternativeEmbedding, secondFace.embedding).toFixed(6)} ` +
+        `A-error=${mean(firstFace.alignmentErrorsA).toFixed(4)}/${max(firstFace.alignmentErrorsA).toFixed(4)},` +
+        `${mean(secondFace.alignmentErrorsA).toFixed(4)}/${max(secondFace.alignmentErrorsA).toFixed(4)} ` +
+        `B-error=${mean(firstFace.alignmentErrorsB).toFixed(4)}/${max(firstFace.alignmentErrorsB).toFixed(4)},` +
+        `${mean(secondFace.alignmentErrorsB).toFixed(4)}/${max(secondFace.alignmentErrorsB).toFixed(4)}`,
+      );
+    });
+  }
+
 
   const reportFaces = buildReportFaces(faces);
 
@@ -864,10 +895,10 @@ async function main() {
       console.log(
         `[SUSPECT CASE] image ${faces[first].imageIndex} / face ${first} <-> ` +
         `image ${faces[second].imageIndex} / face ${second} ` +
-        `A-A=${cosineDistance(faces[first].embedding, faces[second].embedding).toFixed(6)} ` +
-        `A-B=${cosineDistance(faces[first].embedding, faces[second].alternativeEmbedding).toFixed(6)} ` +
-        `B-A=${cosineDistance(faces[first].alternativeEmbedding, faces[second].embedding).toFixed(6)} ` +
-        `B-B=${cosineDistance(faces[first].alternativeEmbedding, faces[second].alternativeEmbedding).toFixed(6)} ` +
+        `B-B=${cosineDistance(faces[first].embedding, faces[second].embedding).toFixed(6)} ` +
+        `B-A=${cosineDistance(faces[first].embedding, faces[second].alternativeEmbedding).toFixed(6)} ` +
+        `A-B=${cosineDistance(faces[first].alternativeEmbedding, faces[second].embedding).toFixed(6)} ` +
+        `A-A=${cosineDistance(faces[first].alternativeEmbedding, faces[second].alternativeEmbedding).toFixed(6)} ` +
         `threshold=${options.threshold}`,
       );
     else
