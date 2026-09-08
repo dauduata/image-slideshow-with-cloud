@@ -76,19 +76,19 @@ new MutationObserver(syncPersonFilterUI).observe(personFilter, {
 });
 
 function imageUrl(item, width = 2400) {
-  let sourceUrl;
-  if (item.thumbnailLink) {
-    sourceUrl = item.thumbnailLink.replace(/=s\d+$/, `=w${width}`);
-    return sourceUrl;
+  if (
+    item.id &&
+    (item.url?.includes('drive.google.com') || item.thumbnailLink?.includes('googleusercontent.com'))
+  ) {
+    return `https://lh3.googleusercontent.com/d/${encodeURIComponent(item.id)}=w${width}`;
   }
   if (item.thumbnailUrl) {
-    sourceUrl = item.thumbnailUrl.replace(/([?&])width=\d+/, `$1width=${width}`).replace(/([?&])height=\d+/, `$1height=${width}`);
-  } else if (item.id && item.url?.includes('drive.google.com')) {
-    sourceUrl = `https://lh3.googleusercontent.com/d/${encodeURIComponent(item.id)}=w${width}`;
-  } else {
-    sourceUrl = item.url;
+    return item.thumbnailUrl
+      .replace(/([?&])width=\d+/, `$1width=${width}`)
+      .replace(/([?&])height=\d+/, `$1height=${width}`);
   }
-  return sourceUrl;
+  if (item.thumbnailLink) return item.thumbnailLink.replace(/=s\d+$/, `=w${width}`);
+  return item.url || '';
 }
 
 async function loadGoogleDriveImages({ apiKey, folderId }) {
