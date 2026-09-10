@@ -11,12 +11,11 @@ const defaults = {
   input: path.join(ROOT, "image-links.js"),
   output: path.join(ROOT, "image-links-labeled.js"),
   clusterOutput: path.join(ROOT, "report", "image-links-clusters.js"),
-  report: path.join(ROOT, "report", "face-clusters-report.html"),
   detector: path.join(ROOT, "models", "face_detection_yunet_2023mar.onnx"),
   recognizer: path.join(ROOT, "models", "face_recognition_sface_2021dec.onnx"),
   concurrency: 3,
   threshold: 0.45,
-  timeout: 30000,
+  timeout: 120000,
   minConfidence: 0.75,
   nmsThreshold: 0.5,
   minFaceSize: 20,
@@ -444,6 +443,21 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     );
     const alignedA = sampleAligned(resized.data, width, height, transformA);
     const alignedB = sampleAligned(resized.data, width, height, transformB);
+    const cropBefore = await sharp(resized.data, { raw: resized.info })
+      .extract({ left, top, width: boxWidth, height: boxHeight })
+      .resize(112, 112)
+      .raw()
+      .toBuffer();
+    const previewBefore = await sharp(cropBefore, {
+      raw: { width: 112, height: 112, channels: 3 },
+    })
+      .jpeg()
+      .toBuffer();
+    const previewAligned = await sharp(alignedB, {
+      raw: { width: 112, height: 112, channels: 3 },
+    })
+      .jpeg()
+      .toBuffer();
     const sfaceTensor = tensorFromRgb(alignedB, 112, 112, false, false);
     if (options.debug) {
       console.log(
@@ -519,6 +533,8 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     faces.push({
       embedding: normalized,
       alternativeEmbedding: normalizedB,
+      preview: `data:image/jpeg;base64,${previewAligned.toString("base64")}`,
+      previewBefore: `data:image/jpeg;base64,${previewBefore.toString("base64")}`,
       alignmentErrorsA: errorsA,
       alignmentErrorsB: errorsB,
       landmarks,
@@ -537,6 +553,27 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
       confidence: detection.confidence,
     });
   }
+  const overlays = faces
+    .map(
+      (face) =>
+        `<rect x="${face.box.left}" y="${face.box.top}" width="${face.box.width}" height="${face.box.height}"/><g>${face.landmarks
+          .map((point) => `<circle cx="${point.x}" cy="${point.y}" r="8"/>`)
+          .join("")}</g>`,
+    )
+    .join("");
+  const annotated = await sharp(resized.data, { raw: resized.info })
+    .composite([
+      {
+        input: Buffer.from(
+          `<svg width="${width}" height="${height}"><style>rect,circle{fill:none;stroke:#00ff55;stroke-width:6}circle{fill:#ff3355}</style>${overlays}</svg>`,
+        ),
+      },
+    ])
+    .jpeg()
+    .toBuffer();
+  faces.forEach((face) => {
+    face.annotated = `data:image/jpeg;base64,${annotated.toString("base64")}`;
+  });
   return {
     width,
     height,
@@ -732,11 +769,51 @@ function cluster(embeddings, imageIds, threshold, debugPair = null) {
   return labels;
 }
 
-function writeReport(fileName) {
+function escapeHtml(value) {
+  return String(value).replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        character
+      ],
+  );
+}
+
+function writeReport(series, faces, labels, names, fileName) {
   fs.mkdirSync(path.dirname(fileName), { recursive: true });
+  const groups = new Map();
+  faces.forEach((face, index) => {
+    const label = labels[index];
+    const key = label >= 0 ? label : "noise";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ face, index });
+  });
+  const sections = [...groups.entries()]
+    .map(([label, groupFaces]) => {
+      const title = label === "noise" ? "noise / unassigned" : names.get(label);
+      const imageIndexes = [...new Set(groupFaces.map(({ face }) => face.imageIndex))];
+      return `<section><h2>${escapeHtml(title)} <small>${groupFaces.length} face(s)</small></h2>${imageIndexes
+        .map(
+          (imageIndex) => {
+            const imageFace = groupFaces.find(
+              ({ face }) => face.imageIndex === imageIndex,
+            );
+            return `<img class="original" src="${imageFace.face.annotated}" loading="lazy"><p>${escapeHtml(series[imageIndex].name)}</p>`;
+          },
+        )
+        .join("")}<div class="grid">${groupFaces
+        .map(
+          ({ face }) =>
+            `<figure><img src="${face.previewBefore}"><img src="${face.preview}"><figcaption>before / aligned 112x112<br>score ${face.confidence.toFixed(3)}<br>${face.box.left},${face.box.top},${face.box.width}x${face.box.height}<br>${face.landmarks
+              .map((point) => `${point.x.toFixed(0)},${point.y.toFixed(0)}`)
+              .join(" | ")}</figcaption></figure>`,
+        )
+        .join("")}</div></section>`;
+    })
+    .join("\n");
   fs.writeFileSync(
     fileName,
-    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Face clusters</title><style>body{font:16px system-ui;margin:24px;background:#f5f3ef;color:#242424}section{border-top:2px solid #242424;padding:12px 0 28px}.original{display:block;max-width:min(100%,900px);height:auto;margin:12px 0}.grid{display:flex;flex-wrap:wrap;gap:12px}article{width:232px}article img{max-width:100%;height:auto}figcaption{font-size:11px;margin-top:4px;line-height:1.35}small{font-size:13px;font-weight:normal}</style><main id="report">Loading...</main><script src="image-links-clusters.js"></script><script>const escapeHtml=value=>String(value).replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));const groups=new Map();seriesData.forEach(record=>record.persons.forEach(person=>{if(!groups.has(person.id))groups.set(person.id,[]);groups.get(person.id).push({record,person})}));document.querySelector('#report').innerHTML=[...groups].map(([id,items])=>'<section><h2>'+escapeHtml(id)+' <small>'+items.length+' face(s)</small></h2>'+[...new Set(items.map(({record})=>record.name))].map(name=>{const item=items.find(({record})=>record.name===name);return '<img class="original" src="'+escapeHtml(item.record.url||item.record.thumbnailUrl||'')+'" loading="lazy"><p>'+escapeHtml(name)+'</p>'}).join('')+'<div class="grid">'+items.map(({person})=>'<article><figcaption>score '+Number(person.confidence).toFixed(3)+'<br>box '+person.box.left+','+person.box.top+','+person.box.width+'x'+person.box.height+'<br>landmarks '+person.landmarks.map(point=>point.x.toFixed(0)+','+point.y.toFixed(0)).join(' | ')+'</figcaption></article>').join('')+'</div></section>').join('')||'<p>No cluster data available.</p>';</script>`,
+    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Face clusters</title><style>body{font:16px system-ui;margin:24px;background:#f5f3ef;color:#242424}section{border-top:2px solid #242424;padding:12px 0 28px}.original{display:block;max-width:min(100%,900px);height:auto;margin:12px 0}.annotated{display:flex;flex-wrap:wrap;gap:12px}.annotated-image{max-width:min(100%,900px);height:auto}.grid{display:flex;flex-wrap:wrap;gap:12px}figure{width:232px;margin:0}figure img{display:inline-block;width:112px;height:112px;object-fit:cover;background:#ddd;margin-right:4px}figcaption{font-size:11px;margin-top:4px;line-height:1.35}small{font-size:13px;font-weight:normal}</style>${sections || "<p>No cluster data available.</p>"}`,
   );
 }
 
@@ -990,9 +1067,10 @@ async function main() {
     `const seriesData = ${JSON.stringify(clusterOutput, null, 2)};\n`,
   );
 
-  // Report HTML/JS are fixed files.
-  // main() does NOT generate them.
-  // writeReport(options.report);
+  if (options.report) {
+    writeReport(series, faces, labels, names, path.resolve(ROOT, options.report));
+    console.log(`Face cluster report written: ${path.resolve(ROOT, options.report)}`);
+  }
 
   const elapsed = Date.now() - started;
   const withFaces = imageFaces.filter(
@@ -1017,7 +1095,7 @@ async function main() {
   Failed images: ${failed.length}
   Output: ${options.output}
   Cluster output: ${options.clusterOutput}
-  Report: ${options.report}
+  Report: ${options.report ? path.resolve(ROOT, options.report) : "not requested"}
   =====================`,
   );
 }
