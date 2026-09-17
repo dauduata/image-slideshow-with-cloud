@@ -11,6 +11,7 @@ const defaults = {
   input: path.join(ROOT, "image-links.js"),
   output: path.join(ROOT, "image-links-labeled.js"),
   clusterOutput: path.join(ROOT, "report", "image-links-clusters.js"),
+  report: path.join(ROOT, "face-clusters-report", "index.html"),
   detector: path.join(ROOT, "models", "face_detection_yunet_2023mar.onnx"),
   recognizer: path.join(ROOT, "models", "face_recognition_sface_2021dec.onnx"),
   concurrency: 3,
@@ -51,8 +52,6 @@ function parseArgs() {
         ? Number(value)
         : value;
   }
-  // if (/\.html\.html$/i.test(options.report))
-  //   throw new Error("Invalid report path: use face-clusters-report.html, not .html.html");
   if (
     options.concurrency < 1 ||
     options.threshold <= 0 ||
