@@ -452,6 +452,12 @@ labelingBtn.addEventListener('click', async () => {
             addLabelLog(`Job status: ${job.status} (${job.processedImages}/${job.totalImages} images, ${job.remainingImages} remaining${job.progress ? `, ${job.progress}%` : ''})`);
             if (job.status === 'completed') {
                 addLabelLog('Labeling completed successfully');
+                const generateResponse = await fetch('/api/generate-fe-data', { method: 'POST' });
+                const generated = await generateResponse.json();
+                if (!generateResponse.ok) {
+                    throw new Error(generated.error || 'Could not generate website data');
+                }
+                addLabelLog(`Generated ${generated.images} images and ${generated.persons} persons.`);
                 labelingBtn.disabled = false;
                 isProcessing = false;
                 await loadGallery();
@@ -478,14 +484,16 @@ publicWebsiteBtn.addEventListener('click', async () => {
     publicWebsiteBtn.disabled = true;
     addLabelLog('Starting public website generation and deployment...');
     try {
-        const generateResponse = await fetch('/api/generate-fe-data', { method: 'POST' });
-        const generated = await generateResponse.json();
-        if (!generateResponse.ok) throw new Error(generated.error || 'Could not generate website data');
-        addLabelLog(`Generated ${generated.images} images and ${generated.persons} persons.`);
+        // const generateResponse = await fetch('/api/generate-fe-data', { method: 'POST' });
+        // const generated = await generateResponse.json();
+        // if (!generateResponse.ok) throw new Error(generated.error || 'Could not generate website data');
+        // addLabelLog(`Generated ${generated.images} images and ${generated.persons} persons.`);
 
         const response = await fetch('/api/deploy-website', { method: 'POST' });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Could not start website deployment');
+        if (!response.ok) {
+            throw new Error(data.error || 'Could not start website deployment');
+        }
         addLabelLog(`Job ID: ${data.jobId}`);
         let displayedLogs = 0;
         const poll = async () => {

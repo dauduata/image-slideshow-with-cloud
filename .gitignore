@@ -9,3 +9,7 @@
 /image-links.js
 /image-links-labeled.js
 /data/
+yarn.lock
+
+/report/image-links-clusters.js
+/face-clusters-report/*
