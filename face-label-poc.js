@@ -4,7 +4,11 @@ const vm = require("vm");
 const os = require("os");
 const sharp = require("sharp");
 const crypto = require("crypto");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
 let ort;
+
+const execFileAsync = promisify(execFile);
 
 const ROOT = __dirname;
 const defaults = {
@@ -44,10 +48,13 @@ function parseArgs() {
       continue;
     }
     if (key === "names") {
-      options.names = String(value)
-        .split(",")
-        .map((name) => name.trim())
-        .filter(Boolean);
+      options.names = [
+        ...(options.names || []),
+        ...String(value)
+          .split(",")
+          .map((name) => name.trim())
+          .filter(Boolean),
+      ];
       continue;
     }
     options[key] =
@@ -86,13 +93,66 @@ function loadSeriesData(fileName) {
 async function fetchBuffer(url, timeout) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
+
   try {
+    console.log("[FETCH START]", url);
+
     const response = await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    console.log("[FETCH RESPONSE]", {
+      status: response.status,
+      url: response.url,
+      contentType: response.headers.get("content-type"),
+      contentLength: response.headers.get("content-length"),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
     return Buffer.from(await response.arrayBuffer());
+
+  } catch (err) {
+    console.error("[FETCH ERROR]", {
+      name: err.name,
+      message: err.message,
+      cause: err.cause,
+      code: err.cause?.code,
+      errno: err.cause?.errno,
+      syscall: err.cause?.syscall,
+      hostname: err.cause?.hostname,
+    });
+
+    try {
+      const { stdout } = await execFileAsync(
+        "curl",
+        [
+          "--fail",
+          "--silent",
+          "--show-error",
+          "--location",
+          "--max-time",
+          String(Math.ceil(timeout / 1000)),
+          url,
+        ],
+        { encoding: "buffer", maxBuffer: 100 * 1024 * 1024 },
+      );
+      console.log("[FETCH FALLBACK] curl succeeded", url);
+      return stdout;
+    } catch (fallbackError) {
+      const details =
+        fallbackError instanceof Error
+          ? fallbackError
+          : new Error(String(fallbackError));
+      throw new Error(
+        `Fetch failed and curl fallback failed: ${err.message}; curl: ${details.message}`,
+        { cause: err },
+      );
+    }
+
   } finally {
     clearTimeout(timer);
   }
@@ -808,30 +868,42 @@ function escapeHtml(value) {
   );
 }
 
+
 function writeReport(series, faces, labels, names, fileName) {
   fs.mkdirSync(path.dirname(fileName), { recursive: true });
-  const images = new Map();
+  const groups = new Map();
   faces.forEach((face, index) => {
-    if (!images.has(face.imageIndex)) images.set(face.imageIndex, []);
-    images.get(face.imageIndex).push({ face, index });
+    const label = labels[index];
+    const key = label >= 0 ? label : "noise";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ face, index });
   });
-  const sections = [...images.entries()]
-    .map(([imageIndex, imageFaces]) => {
-      return `<section><h2>${escapeHtml(series[imageIndex].name)} <small>${imageFaces.length} face(s)</small></h2><img class="original" src="${imageFaces[0].face.annotated}" loading="lazy"><div class="grid">${imageFaces
+  const sections = [...groups.entries()]
+    .map(([label, groupFaces]) => {
+      const title = label === "noise" ? "noise / unassigned" : names.get(label);
+      const imageIndexes = [...new Set(groupFaces.map(({ face }) => face.imageIndex))];
+      return `<section><h2>${escapeHtml(title)} <small>${groupFaces.length} face(s)</small></h2>${imageIndexes
         .map(
-          ({ face, index }) => {
-            const label = labels[index] >= 0 ? names.get(labels[index]) : "noise / unassigned";
-            return `<figure><img src="${face.previewBefore}"><img src="${face.preview}"><figcaption>${escapeHtml(label)}<br>score ${face.confidence.toFixed(3)}<br>${face.box.left},${face.box.top},${face.box.width}x${face.box.height}<br>${face.landmarks
-              .map((point) => `${point.x.toFixed(0)},${point.y.toFixed(0)}`)
-              .join(" | ")}</figcaption></figure>`;
+          (imageIndex) => {
+            const imageFace = groupFaces.find(
+              ({ face }) => face.imageIndex === imageIndex,
+            );
+            return `<img class="original" src="${imageFace.face.annotated}" loading="lazy"><p>${escapeHtml(series[imageIndex].name)}</p>`;
           },
+        )
+        .join("")}<div class="grid">${groupFaces
+        .map(
+          ({ face }) =>
+            `<figure><img src="${face.previewBefore}"><img src="${face.preview}"><figcaption>before / aligned 112x112<br>score ${face.confidence.toFixed(3)}<br>${face.box.left},${face.box.top},${face.box.width}x${face.box.height}<br>${face.landmarks
+              .map((point) => `${point.x.toFixed(0)},${point.y.toFixed(0)}`)
+              .join(" | ")}</figcaption></figure>`,
         )
         .join("")}</div></section>`;
     })
     .join("\n");
   fs.writeFileSync(
     fileName,
-    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Face clusters</title><style>body{font:16px system-ui;margin:24px;background:#f5f3ef;color:#242424}section{border-top:2px solid #242424;padding:12px 0 28px}.original{display:block;max-width:min(100%,900px);height:auto;margin:12px 0}.grid{display:flex;flex-wrap:wrap;gap:12px}figure{width:232px;margin:0}figure img{display:inline-block;width:112px;height:112px;object-fit:cover;background:#ddd;margin-right:4px}figcaption{font-size:11px;margin-top:4px;line-height:1.35}small{font-size:13px;font-weight:normal}</style>${sections || "<p>No cluster data available.</p>"}`,
+    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Face clusters</title><style>body{font:16px system-ui;margin:24px;background:#f5f3ef;color:#242424}section{border-top:2px solid #242424;padding:12px 0 28px}.original{display:block;max-width:min(100%,900px);height:auto;margin:12px 0}.annotated{display:flex;flex-wrap:wrap;gap:12px}.annotated-image{max-width:min(100%,900px);height:auto}.grid{display:flex;flex-wrap:wrap;gap:12px}figure{width:232px;margin:0}figure img{display:inline-block;width:112px;height:112px;object-fit:cover;background:#ddd;margin-right:4px}figcaption{font-size:11px;margin-top:4px;line-height:1.35}small{font-size:13px;font-weight:normal}</style>${sections || "<p>No cluster data available.</p>"}`,
   );
 }
 
@@ -904,8 +976,14 @@ async function main() {
         );
       } catch (error) {
         failed.push(index);
+        const details = error instanceof Error ? error : new Error(String(error));
         console.log(
-          `[${index + 1}/${series.length}] ${series[index].name}\nERROR: ${error.message}\nSKIPPED`,
+          `[${index + 1}/${series.length}] ${series[index].name}\n` +
+          `URL: ${series[index].url || "<missing>"}\n` +
+          `thumbnailUrl: ${series[index].thumbnailUrl || "<missing>"}\n` +
+          `ERROR: ${details.name}: ${details.message}\n` +
+          `STACK:\n${details.stack || "<no stack>"}\n` +
+          "SKIPPED",
         );
       }
     }
@@ -916,6 +994,10 @@ async function main() {
       worker,
     ),
   );
+  if (failed.length === series.length && series.length > 0)
+    throw new Error(
+      `All ${failed.length} selected image(s) failed; see SKIPPED diagnostics above`,
+    );
 
   const faces = [];
 
