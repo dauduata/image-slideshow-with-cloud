@@ -13,7 +13,7 @@ const defaults = {
   clusterOutput: path.join(ROOT, "report", "image-links-clusters.js"),
   detector: path.join(ROOT, "models", "face_detection_yunet_2023mar.onnx"),
   recognizer: path.join(ROOT, "models", "face_recognition_sface_2021dec.onnx"),
-  concurrency: 3,
+  concurrency: 1,
   threshold: 0.45,
   timeout: 120000,
   minConfidence: 0.75,
@@ -30,7 +30,7 @@ function parseArgs() {
     const argument = values[index];
     if (argument === "--help") {
       console.log(
-        "node face-label-poc.js [--input file] [--output file] [--cluster-output file] [--report file] [--concurrency 2] [--threshold 0.45]",
+        "node face-label-poc.js [--input file] [--output file] [--cluster-output file] [--report file] [--name file] [--name file] [--concurrency 2] [--threshold 0.45]",
       );
       process.exit(0);
     }
@@ -38,6 +38,17 @@ function parseArgs() {
       throw new Error(`Invalid argument: ${argument}`);
     const key = argument.slice(2);
     const value = values[++index];
+    if (key === "name") {
+      options.names = [...(options.names || []), value];
+      continue;
+    }
+    if (key === "names") {
+      options.names = String(value)
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean);
+      continue;
+    }
     options[key] =
       [
         "concurrency",
@@ -426,6 +437,13 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
     const boxWidth = right - left;
     const boxHeight = bottom - top;
     const aspectRatio = Math.max(boxWidth / boxHeight, boxHeight / boxWidth);
+    if (options.debug)
+      console.log("[LANDMARK-RAW]", {
+        imageWidth: width,
+        imageHeight: height,
+        box: { x: left, y: top, width: boxWidth, height: boxHeight },
+        landmarks,
+      });
     if (
       Math.min(boxWidth, boxHeight) < options.minFaceSize ||
       aspectRatio > options.maxFaceAspectRatio
@@ -561,6 +579,18 @@ async function detectAndEmbed(buffer, detector, recognizer, options) {
           .join("")}</g>`,
     )
     .join("");
+  if (options.debug)
+    console.log("[LANDMARK-DRAW]", {
+      imageWidth: width,
+      imageHeight: height,
+      canvasWidth: width,
+      canvasHeight: height,
+      displayWidth: width,
+      displayHeight: height,
+      scaleX: 1,
+      scaleY: 1,
+      landmarks: faces.flatMap((face) => face.landmarks),
+    });
   const annotated = await sharp(resized.data, { raw: resized.info })
     .composite([
       {
@@ -781,39 +811,28 @@ function escapeHtml(value) {
 
 function writeReport(series, faces, labels, names, fileName) {
   fs.mkdirSync(path.dirname(fileName), { recursive: true });
-  const groups = new Map();
+  const images = new Map();
   faces.forEach((face, index) => {
-    const label = labels[index];
-    const key = label >= 0 ? label : "noise";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push({ face, index });
+    if (!images.has(face.imageIndex)) images.set(face.imageIndex, []);
+    images.get(face.imageIndex).push({ face, index });
   });
-  const sections = [...groups.entries()]
-    .map(([label, groupFaces]) => {
-      const title = label === "noise" ? "noise / unassigned" : names.get(label);
-      const imageIndexes = [...new Set(groupFaces.map(({ face }) => face.imageIndex))];
-      return `<section><h2>${escapeHtml(title)} <small>${groupFaces.length} face(s)</small></h2>${imageIndexes
+  const sections = [...images.entries()]
+    .map(([imageIndex, imageFaces]) => {
+      return `<section><h2>${escapeHtml(series[imageIndex].name)} <small>${imageFaces.length} face(s)</small></h2><img class="original" src="${imageFaces[0].face.annotated}" loading="lazy"><div class="grid">${imageFaces
         .map(
-          (imageIndex) => {
-            const imageFace = groupFaces.find(
-              ({ face }) => face.imageIndex === imageIndex,
-            );
-            return `<img class="original" src="${imageFace.face.annotated}" loading="lazy"><p>${escapeHtml(series[imageIndex].name)}</p>`;
-          },
-        )
-        .join("")}<div class="grid">${groupFaces
-        .map(
-          ({ face }) =>
-            `<figure><img src="${face.previewBefore}"><img src="${face.preview}"><figcaption>before / aligned 112x112<br>score ${face.confidence.toFixed(3)}<br>${face.box.left},${face.box.top},${face.box.width}x${face.box.height}<br>${face.landmarks
+          ({ face, index }) => {
+            const label = labels[index] >= 0 ? names.get(labels[index]) : "noise / unassigned";
+            return `<figure><img src="${face.previewBefore}"><img src="${face.preview}"><figcaption>${escapeHtml(label)}<br>score ${face.confidence.toFixed(3)}<br>${face.box.left},${face.box.top},${face.box.width}x${face.box.height}<br>${face.landmarks
               .map((point) => `${point.x.toFixed(0)},${point.y.toFixed(0)}`)
-              .join(" | ")}</figcaption></figure>`,
+              .join(" | ")}</figcaption></figure>`;
+          },
         )
         .join("")}</div></section>`;
     })
     .join("\n");
   fs.writeFileSync(
     fileName,
-    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Face clusters</title><style>body{font:16px system-ui;margin:24px;background:#f5f3ef;color:#242424}section{border-top:2px solid #242424;padding:12px 0 28px}.original{display:block;max-width:min(100%,900px);height:auto;margin:12px 0}.annotated{display:flex;flex-wrap:wrap;gap:12px}.annotated-image{max-width:min(100%,900px);height:auto}.grid{display:flex;flex-wrap:wrap;gap:12px}figure{width:232px;margin:0}figure img{display:inline-block;width:112px;height:112px;object-fit:cover;background:#ddd;margin-right:4px}figcaption{font-size:11px;margin-top:4px;line-height:1.35}small{font-size:13px;font-weight:normal}</style>${sections || "<p>No cluster data available.</p>"}`,
+    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Face clusters</title><style>body{font:16px system-ui;margin:24px;background:#f5f3ef;color:#242424}section{border-top:2px solid #242424;padding:12px 0 28px}.original{display:block;max-width:min(100%,900px);height:auto;margin:12px 0}.grid{display:flex;flex-wrap:wrap;gap:12px}figure{width:232px;margin:0}figure img{display:inline-block;width:112px;height:112px;object-fit:cover;background:#ddd;margin-right:4px}figcaption{font-size:11px;margin-top:4px;line-height:1.35}small{font-size:13px;font-weight:normal}</style>${sections || "<p>No cluster data available.</p>"}`,
   );
 }
 
@@ -840,15 +859,17 @@ function buildReportFaces(faceList) {
 async function main() {
   const options = parseArgs();
   const allSeries = loadSeriesData(options.input);
-  const selected = options.name
-    ? allSeries.filter((record) => record.name === options.name)
+  const selected = options.names?.length
+    ? allSeries.filter((record) => options.names.includes(record.name))
     : allSeries;
   const series =
     options.limit > 0 ? selected.slice(0, options.limit) : selected;
-  if (options.name && series.length !== 1)
-    throw new Error(
-      `Expected exactly one record named ${options.name}, found ${series.length}`,
-    );
+  if (options.names?.length) {
+    const foundNames = new Set(selected.map((record) => record.name));
+    const missingNames = options.names.filter((name) => !foundNames.has(name));
+    if (missingNames.length)
+      throw new Error(`Image name(s) not found: ${missingNames.join(", ")}`);
+  }
   if (!fs.existsSync(options.detector) || !fs.existsSync(options.recognizer))
     throw new Error("Models missing. Run: npm run download-face-models");
   try {
