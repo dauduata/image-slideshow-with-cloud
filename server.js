@@ -180,10 +180,16 @@ function runWebsiteDeployment(jobId) {
         if (!projectName) return reject(new Error('Public website Firebase project is not configured'));
 
         const deployDirectory = path.join(ROOT, 'FE');
-        const deployCommand = path.join(deployDirectory, 'deploy-website.bat');
+        const deployShellScript = path.join(deployDirectory, 'deploy-website.sh');
+        const command = process.platform === 'win32'
+            ? (process.env.ComSpec || 'cmd.exe')
+            : '/bin/bash';
+        const commandArgs = process.platform === 'win32'
+            ? ['/d', '/s', '/c', path.join(deployDirectory, 'deploy-website.bat'), projectName]
+            : [deployShellScript, projectName];
         const child = require('node:child_process').spawn(
-            process.env.ComSpec || 'cmd.exe',
-            ['/d', '/s', '/c', deployCommand, projectName],
+            command,
+            commandArgs,
             { cwd: deployDirectory, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
         );
         const output = (chunk) => {

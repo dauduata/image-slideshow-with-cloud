@@ -77,7 +77,7 @@ try {
     
     // Run firebase deploy
     console.log('\n[DEPLOY] Running firebase deploy...');
-    execSync('firebase deploy', {
+    execSync(`firebase deploy --project ${TEN_PROJECT}`, {
         cwd: TARGET_DIR,
         env: firebaseEnv,
         stdio: 'inherit'

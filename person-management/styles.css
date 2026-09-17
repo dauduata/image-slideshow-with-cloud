@@ -541,7 +541,7 @@ button.small-btn {
 }
 
 #gallery-status {
-    text-align: center;
+    text-align: right;
     color: var(--muted);
     font-family: ui-sans-serif, system-ui, sans-serif;
 }
