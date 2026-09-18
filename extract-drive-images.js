@@ -3,10 +3,8 @@ const path = require('node:path');
 const dotenv = require('dotenv');
 
 dotenv.config();
-
-
-const DRIVE_API_URL = 'https://www.googleapis.com/drive/v3/files';
-const PAGE_SIZE = 1000;
+const DRIVE_API_URL = process.env.DRIVE_API_URL || 'https://www.googleapis.com/drive/v3/files';
+const PAGE_SIZE = parseInt(process.env.PAGE_SIZE) || 1000;
 
 function printUsage() {
   console.log('Usage: node extract-drive-images.js <drive-folder-url> [output-file.js]');

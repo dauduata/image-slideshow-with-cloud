@@ -5,7 +5,7 @@ const path = require("node:path");
 const { ROOT, parseArgs, loadSeriesData } = require("./config");
 const { fetchRecordImage } = require("./fetcher");
 const { detectAndEmbed } = require("./vision");
-const { cluster } = require("./clustering");
+const { cluster, cosineDistance } = require("./clustering");
 const { buildReportFaces, writeReport } = require("./report");
 
 async function loadModels(options) {
@@ -95,10 +95,41 @@ async function main() {
   const models = await loadModels(options);
   const { imageFaces, failed } = await processImages(series, models, options);
   const faces = flattenFaces(imageFaces);
+  if (options.debug) {
+    const suspiciousPairs = [[6, 10], [5, 6], [5, 10], [0, 2], [0, 10], [0, 6]];
+    console.log("[ALIGNMENT DISTANCE SUMMARY] production=B, alternative=A");
+    suspiciousPairs.forEach(([first, second]) => {
+      if (!faces[first] || !faces[second]) {
+        console.log(`[ALIGNMENT DISTANCE] pair=${first},${second} unavailable`);
+        return;
+      }
+      const firstFace = faces[first];
+      const secondFace = faces[second];
+      const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+      const max = (values) => Math.max(...values);
+      console.log(`[ALIGNMENT DISTANCE] pair=${first},${second} production(B-B)=${cosineDistance(firstFace.embedding, secondFace.embedding).toFixed(6)} alternative(A-A)=${cosineDistance(firstFace.alternativeEmbedding, secondFace.alternativeEmbedding).toFixed(6)} B-A=${cosineDistance(firstFace.embedding, secondFace.alternativeEmbedding).toFixed(6)} A-B=${cosineDistance(firstFace.alternativeEmbedding, secondFace.embedding).toFixed(6)} A-error=${mean(firstFace.alignmentErrorsA).toFixed(4)}/${max(firstFace.alignmentErrorsA).toFixed(4)},${mean(secondFace.alignmentErrorsA).toFixed(4)}/${max(secondFace.alignmentErrorsA).toFixed(4)} B-error=${mean(firstFace.alignmentErrorsB).toFixed(4)}/${max(firstFace.alignmentErrorsB).toFixed(4)},${mean(secondFace.alignmentErrorsB).toFixed(4)}/${max(secondFace.alignmentErrorsB).toFixed(4)}`);
+    });
+    for (let first = 0; first < faces.length; first += 1)
+      for (let second = first + 1; second < faces.length; second += 1)
+        console.log(`DEBUG distance image-${faces[first].imageIndex}/face-${first} <-> image-${faces[second].imageIndex}/face-${second}: ${cosineDistance(faces[first].embedding, faces[second].embedding).toFixed(6)}`);
+  }
+  if (options.clusterPair) {
+    const [first, second] = String(options.clusterPair).split(",").map(Number);
+    if (faces[first] && faces[second])
+      console.log(`[SUSPECT CASE] image ${faces[first].imageIndex} / face ${first} <-> image ${faces[second].imageIndex} / face ${second} B-B=${cosineDistance(faces[first].embedding, faces[second].embedding).toFixed(6)} B-A=${cosineDistance(faces[first].embedding, faces[second].alternativeEmbedding).toFixed(6)} A-B=${cosineDistance(faces[first].alternativeEmbedding, faces[second].embedding).toFixed(6)} A-A=${cosineDistance(faces[first].alternativeEmbedding, faces[second].alternativeEmbedding).toFixed(6)} threshold=${options.threshold}`);
+    else console.log(`[SUSPECT CASE] requested pair ${options.clusterPair} unavailable; faces=${faces.length}`);
+  }
   const clusteringStarted = Date.now();
   const labels = cluster(faces.map((face) => face.embedding), faces.map((face) => face.imageIndex), options.threshold, options.clusterPair);
   const names = new Map();
   labels.forEach((label) => { if (label >= 0 && !names.has(label)) names.set(label, `person-${String(names.size + 1).padStart(3, "0")}`); });
+  if (options.debug)
+    labels.forEach((label, index) => console.log(`DEBUG face-${index} => ${label >= 0 ? names.get(label) : "noise"}`));
+  if (options.clusterPair) {
+    const [first, second] = String(options.clusterPair).split(",").map(Number);
+    if (faces[first] && faces[second])
+      console.log(`[SUSPECT CLUSTER] face ${first}=${labels[first] >= 0 ? names.get(labels[first]) : "noise"} face ${second}=${labels[second] >= 0 ? names.get(labels[second]) : "noise"} merged=${labels[first] >= 0 && labels[first] === labels[second]}`);
+  }
   const clusteringTime = Date.now() - clusteringStarted;
   const reportFaces = writeDataOutputs(series, imageFaces, faces, labels, names, options);
   if (options.report) {

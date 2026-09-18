@@ -25,6 +25,14 @@ function cluster(embeddings, imageIds, threshold, debugPair = null) {
     }
   console.log(`[CLUSTER] START faces=${embeddings.length} threshold=${threshold} pairs=${distanceCount} min=${(distanceCount ? minDistance : 0).toFixed(4)} avg=${(distanceCount ? distanceSum / distanceCount : 0).toFixed(4)} max=${(distanceCount ? maxDistance : 0).toFixed(4)}`);
   const tracedPair = debugPair ? String(debugPair).split(",").map(Number) : null;
+  if (tracedPair && embeddings[tracedPair[0]] && embeddings[tracedPair[1]]) {
+    const [first, second] = tracedPair;
+    const neighbors = [];
+    for (let index = 0; index < embeddings.length; index += 1)
+      if (index !== first && distanceMatrix[first][index] <= threshold)
+        neighbors.push(`${index}:${distanceMatrix[first][index].toFixed(6)}`);
+    console.log(`[CLUSTER TRACE] pair=${first},${second} direct=${distanceMatrix[first][second].toFixed(6)} neighborsOfFirst=[${neighbors.join(",")}] corePoint=not-used`);
+  }
   let clusters = embeddings.map((_, index) => [index]);
   let mergeCount = 0;
   let sameImageRejected = 0;
@@ -35,6 +43,8 @@ function cluster(embeddings, imageIds, threshold, debugPair = null) {
       for (let second = first + 1; second < clusters.length; second += 1) {
         const imagesInFirstCluster = new Set(clusters[first].map((index) => imageIds[index]));
         if (clusters[second].some((index) => imagesInFirstCluster.has(imageIds[index]))) {
+          if (tracedPair && (clusters[first].includes(tracedPair[0]) || clusters[second].includes(tracedPair[0])) && (clusters[first].includes(tracedPair[1]) || clusters[second].includes(tracedPair[1])))
+            console.log(`[CLUSTER TRACE] reject-traced-pair clusters=${first},${second} reason=same-image membersA=[${clusters[first].join(",")}] membersB=[${clusters[second].join(",")}]`);
           sameImageRejected += 1;
           continue;
         }
@@ -48,8 +58,22 @@ function cluster(embeddings, imageIds, threshold, debugPair = null) {
       }
     if (bestPair === null) break;
     const [first, second] = bestPair;
-    if (bestDistance > threshold) break;
+    if (tracedPair) {
+      const tracedClusters = clusters.map((members, index) => ({ index, members })).filter(({ members }) => members.includes(tracedPair[0]) || members.includes(tracedPair[1])).map(({ index, members }) => `${index}=[${members.join(",")}]`).join(" ");
+      console.log(`[CLUSTER TRACE] candidate=${first},${second} complete=${bestDistance.toFixed(6)} traced=${tracedClusters}`);
+    }
+    if (bestDistance > threshold) {
+      console.log(`[CLUSTER] STOP threshold distance=${bestDistance.toFixed(4)} threshold=${threshold} A=[${clusters[first].join(",")}] B=[${clusters[second].join(",")}]`);
+      break;
+    }
+    const pairDistances = [];
+    for (const firstIndex of clusters[first])
+      for (const secondIndex of clusters[second])
+        pairDistances.push({ firstIndex, secondIndex, distance: distanceMatrix[firstIndex][secondIndex] });
+    pairDistances.sort((left, right) => right.distance - left.distance);
     console.log(`[CLUSTER] MERGE #${mergeCount + 1} complete=${bestDistance.toFixed(4)} threshold=${threshold} A=[${clusters[first].join(",")}] B=[${clusters[second].join(",")}]`);
+    for (const pair of pairDistances)
+      console.log(`  face ${pair.firstIndex} (image=${imageIds[pair.firstIndex]}) <-> face ${pair.secondIndex} (image=${imageIds[pair.secondIndex]}) distance=${pair.distance.toFixed(4)}`);
     clusters[first] = [...clusters[first], ...clusters[second]];
     clusters.splice(second, 1);
     mergeCount += 1;

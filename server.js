@@ -12,22 +12,22 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const ROOT = __dirname;
+const envPath = (name, fallback) => path.resolve(ROOT, process.env[name] || fallback);
 const PORT = Number(process.env.PORT || 3000);
-const INPUT_FILE_NAME = 'image-links.js';
-const LABELED_FILE_NAME = 'image-links-labeled.js';
-const GENERATED_FILE_URL = '/FE/public/seriesData.js';
-// const LABEL_SERVICE = path.join(ROOT, 'face-label-poc.js');
-const LABEL_SERVICE = path.join(ROOT, 'services', 'face-label', 'runner.js');
-const ALIASES_FILE = path.join(ROOT, 'data', 'person-aliases.json');
-const GENERATED_FILE = path.join(ROOT, 'FE', 'public', 'seriesData.js');
-const REPORT_DIRECTORY = path.join(ROOT, 'report');
-const REPORT_FILE = path.join(ROOT, 'face-clusters-report', 'index.html');
+const INPUT_FILE_NAME = process.env.APP_INPUT_FILE_NAME || 'image-links.js';
+const LABELED_FILE_NAME = process.env.APP_LABELED_FILE_NAME || 'image-links-labeled.js';
+const GENERATED_FILE_URL = process.env.APP_GENERATED_FILE_URL || '/FE/public/seriesData.js';
+const LABEL_SERVICE = envPath('APP_LABEL_SERVICE', 'face-label-poc.js');
+const ALIASES_FILE = envPath('APP_ALIASES_FILE', path.join('data', 'person-aliases.json'));
+const GENERATED_FILE = envPath('APP_GENERATED_FILE', path.join('FE', 'public', 'seriesData.js'));
+const REPORT_DIRECTORY = envPath('APP_REPORT_DIRECTORY', 'report');
+const REPORT_FILE = envPath('APP_REPORT_FILE', path.join('face-clusters-report', 'index.html'));
 const LABELING_OUTPUT_FILE = path.join(ROOT, LABELED_FILE_NAME);
 const INPUT_FILE = path.join(ROOT, INPUT_FILE_NAME);
 
 const LABELED_FILE = LABELING_OUTPUT_FILE;
 
-const IMAGE_DATA_FILE = path.join(ROOT, 'data', 'image-data.json');
+const IMAGE_DATA_FILE = envPath('APP_IMAGE_DATA_FILE', path.join('data', 'image-data.json'));
 
 const jobManager = {
     jobs: new Map(),
@@ -184,7 +184,7 @@ function runLabeling(jobId) {
 
 function runWebsiteDeployment(jobId) {
     return new Promise((resolve, reject) => {
-        const serviceAccountFile = path.join(ROOT, 'FE', 'firebase-danglephd.iptp.test.json');
+        const serviceAccountFile = envPath('PUBLIC_WEBSITE_SERVICE_ACCOUNT', path.join('FE', 'firebase-danglephd.iptp.test.json'));
         let projectName = process.env.PUBLIC_WEBSITE_PROJECT || 'baoloc-summer-2026';
         if (!projectName && fsSync.existsSync(serviceAccountFile)) {
             projectName = JSON.parse(fsSync.readFileSync(serviceAccountFile, 'utf8')).project_id;
@@ -194,8 +194,8 @@ function runWebsiteDeployment(jobId) {
             return reject(new Error(`Service Account not found: ${serviceAccountFile}`));
         }
 
-        const deployDirectory = path.join(ROOT, 'FE');
-        const deployShellScript = path.join(deployDirectory, 'deploy-website.sh');
+        const deployDirectory = envPath('PUBLIC_WEBSITE_DIRECTORY', 'FE');
+        const deployShellScript = envPath('PUBLIC_WEBSITE_SCRIPT', path.join('FE', 'deploy-website.sh'));
         const command = process.platform === 'win32'
             ? (process.env.ComSpec || 'cmd.exe')
             : '/bin/bash';
