@@ -138,17 +138,24 @@ async function fetchBuffer(url, timeout) {
           String(Math.ceil(timeout / 1000)),
           url,
         ],
-        { encoding: "buffer", maxBuffer: 100 * 1024 * 1024 },
+        {
+          encoding: "buffer",
+          maxBuffer: 100 * 1024 * 1024,
+        },
       );
+
       console.log("[FETCH FALLBACK] curl succeeded", url);
       return stdout;
+
     } catch (fallbackError) {
       const details =
         fallbackError instanceof Error
           ? fallbackError
           : new Error(String(fallbackError));
+
       throw new Error(
-        `Fetch failed and curl fallback failed: ${err.message}; curl: ${details.message}`,
+        `Fetch failed and curl fallback failed: ${err.message}; ` +
+        `curl: ${details.message}`,
         { cause: err },
       );
     }
@@ -1101,7 +1108,7 @@ async function main() {
   if (options.debug)
     labels.forEach((label, index) =>
       console.log(
-        `DEBUG face-${index + 1} => ${label >= 0 ? names.get(label) : "noise"}`,
+        `DEBUG face-${index} => ${label >= 0 ? names.get(label) : "noise"}`,
       ),
     );
   if (options.clusterPair) {

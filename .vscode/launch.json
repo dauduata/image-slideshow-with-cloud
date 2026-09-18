@@ -1,0 +1,45 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug face-label-poc.js",
+            "program": "${workspaceFolder}/face-label-poc.js",
+            "args": [
+                "--input",
+                "image-links.js",
+                "--output",
+                "image-links-labeled.js",
+                "--report",
+                "face-clusters-report.html",
+                "--name",
+                "_DSC0615.JPG",
+                "--name",
+                "_DSC0616.JPG",
+                "--concurrency",
+                "1",
+                "--threshold",
+                "0.45",
+                "--timeout",
+                "30000",
+                "--maxDimension",
+                "1600",
+                "--debug",
+                "true"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Launch Chrome against localhost",
+            "url": "http://localhost:8080",
+            "webRoot": "${workspaceFolder}"
+        }
+    ]
+}

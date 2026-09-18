@@ -13,3 +13,4 @@ yarn.lock
 
 /report/image-links-clusters.js
 /face-clusters-report/*
+face-label-poc.log
