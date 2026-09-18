@@ -7,11 +7,17 @@ const { URL } = require('node:url');
 const googleDrive = require('./extract/google-drive/service');
 const oneDrive = require('./extract/onedrive/service');
 
+const dotenv = require('dotenv');
+
+dotenv.config();
+
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
 const INPUT_FILE_NAME = 'image-links.js';
 const LABELED_FILE_NAME = 'image-links-labeled.js';
 const GENERATED_FILE_URL = '/FE/public/seriesData.js';
+// const LABEL_SERVICE = path.join(ROOT, 'face-label-poc.js');
+const LABEL_SERVICE = path.join(ROOT, 'services', 'face-label', 'runner.js');
 const ALIASES_FILE = path.join(ROOT, 'data', 'person-aliases.json');
 const GENERATED_FILE = path.join(ROOT, 'FE', 'public', 'seriesData.js');
 const REPORT_DIRECTORY = path.join(ROOT, 'report');
@@ -131,7 +137,7 @@ function runLabeling(jobId) {
     });
     return new Promise((resolve, reject) => {
         const child = require('node:child_process').spawn(process.execPath, [
-            path.join(ROOT, 'face-label-poc.js'),
+            LABEL_SERVICE,
             '--input', input,
             '--output', LABELING_OUTPUT_FILE,
             '--report', REPORT_FILE

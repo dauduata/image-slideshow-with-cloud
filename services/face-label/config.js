@@ -26,7 +26,7 @@ function parseArgs(argv = process.argv.slice(2)) {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--help") {
-      console.log("node face-label-poc.js [--input file] [--output file] [--cluster-output file] [--report file] [--name file] [--names a,b] [--concurrency 2] [--threshold 0.45]");
+      console.log("node services/face-label/runner.js [--input file] [--output file] [--cluster-output file] [--report file] [--name file] [--names a,b] [--concurrency 2] [--threshold 0.45]");
       process.exit(0);
     }
     if (!argument.startsWith("--") || argv[index + 1] === undefined)

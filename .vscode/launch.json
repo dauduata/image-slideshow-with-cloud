@@ -6,9 +6,39 @@
     "configurations": [
         {
             "type": "node",
-            "request": "launch",
+            "request": "launch",            
             "name": "Debug face-label-poc.js",
             "program": "${workspaceFolder}/face-label-poc.js",
+            "args": [
+                "--input",
+                "image-links.js",
+                "--output",
+                "image-links-labeled.js",
+                "--report",
+                "face-clusters-report.html",
+                "--name",
+                "_DSC0615.JPG",
+                "--name",
+                "_DSC0616.JPG",
+                "--concurrency",
+                "1",
+                "--threshold",
+                "0.45",
+                "--timeout",
+                "30000",
+                "--maxDimension",
+                "1600",
+                "--debug",
+                "true"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },        
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug face-label runner.js",
+            "program": "${workspaceFolder}/services/face-label/runner.js",
             "args": [
                 "--input",
                 "image-links.js",

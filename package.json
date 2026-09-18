@@ -5,9 +5,9 @@
   "description": "Extract public image links from a Google Drive folder",
   "scripts": {
     "start": "node server.js",
-    "extract": "node extract-drive-images.js",
+    "extract": "node services/google-drive/runner.js",
     "extract:onedrive": "node extract-onedrive-images.js",
-    "face-label": "node face-label-poc.js",
+    "face-label": "node services/face-label/runner.js",
     "download-face-models": "node download-face-models.js"
   },
   "dependencies": {
