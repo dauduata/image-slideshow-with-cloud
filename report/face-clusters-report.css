@@ -79,6 +79,63 @@ body {
     box-shadow: 0 8px 24px rgba(36, 36, 36, 0.14);
 }
 
+.alias-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(100%, 480px);
+    margin-top: 12px;
+}
+
+.report-header .person-filter-control,
+.report-header .alias-controls {
+    display: inline-flex;
+    vertical-align: top;
+    margin-top: 16px;
+    margin-right: 16px;
+}
+
+.alias-controls label {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.alias-controls input {
+    min-width: 0;
+    /* flex: 1; */
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid #b8b2a8;
+    border-radius: 6px;
+    background: #fffdf9;
+    color: #242424;
+    font: inherit;
+}
+
+.alias-controls button {
+    min-height: 38px;
+    padding: 8px 14px;
+    border: 1px solid #242424;
+    border-radius: 6px;
+    background: #242424;
+    color: #fffdf9;
+    font: inherit;
+    cursor: pointer;
+}
+
+.alias-controls button:disabled,
+.alias-controls input:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+#alias-status {
+    color: #6d675f;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
 .person-filter-option {
     display: flex;
     align-items: center;
@@ -103,6 +160,13 @@ body {
 }
 
 @media (max-width: 560px) {
+    .report-header .person-filter-control,
+    .report-header .alias-controls {
+        display: flex;
+        width: 100%;
+        margin-right: 0;
+    }
+
     .person-filter-control {
         align-items: flex-start;
         flex-direction: column;
@@ -113,6 +177,15 @@ body {
         top: calc(100% + 6px);
         right: 0;
         width: 100%;
+    }
+
+    .alias-controls {
+        align-items: stretch;
+        flex-wrap: wrap;
+    }
+
+    .alias-controls input {
+        flex-basis: 100%;
     }
 }
 

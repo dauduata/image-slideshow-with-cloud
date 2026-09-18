@@ -9,12 +9,18 @@ const oneDrive = require('./extract/onedrive/service');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
+const INPUT_FILE_NAME = 'image-links.js';
+const LABELED_FILE_NAME = 'image-links-labeled.js';
+const GENERATED_FILE_URL = '/FE/public/seriesData.js';
 const ALIASES_FILE = path.join(ROOT, 'data', 'person-aliases.json');
 const GENERATED_FILE = path.join(ROOT, 'FE', 'public', 'seriesData.js');
 const REPORT_DIRECTORY = path.join(ROOT, 'report');
 const REPORT_FILE = path.join(ROOT, 'face-clusters-report', 'index.html');
-const LABELING_OUTPUT_FILE = path.join(ROOT, 'image-links-labeled.js');
+const LABELING_OUTPUT_FILE = path.join(ROOT, LABELED_FILE_NAME);
+const INPUT_FILE = path.join(ROOT, INPUT_FILE_NAME);
+
 const LABELED_FILE = LABELING_OUTPUT_FILE;
+
 const IMAGE_DATA_FILE = path.join(ROOT, 'data', 'image-data.json');
 
 const jobManager = {
@@ -117,7 +123,7 @@ async function saveImageData(folderUrl, outputFile) {
 }
 
 function runLabeling(jobId) {
-    const input = path.join(ROOT, 'image-links.js');
+    const input = INPUT_FILE;
     const totalImages = loadSeries(input).length;
     jobManager.updateJob(jobId, {
         totalImages,
@@ -178,6 +184,9 @@ function runWebsiteDeployment(jobId) {
             projectName = JSON.parse(fsSync.readFileSync(serviceAccountFile, 'utf8')).project_id;
         }
         if (!projectName) return reject(new Error('Public website Firebase project is not configured'));
+        if (!fsSync.existsSync(serviceAccountFile)) {
+            return reject(new Error(`Service Account not found: ${serviceAccountFile}`));
+        }
 
         const deployDirectory = path.join(ROOT, 'FE');
         const deployShellScript = path.join(deployDirectory, 'deploy-website.sh');
@@ -192,8 +201,10 @@ function runWebsiteDeployment(jobId) {
             commandArgs,
             { cwd: deployDirectory, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
         );
+        const outputLines = [];
         const output = (chunk) => {
             for (const line of chunk.toString().split(/\r?\n/).filter(Boolean)) {
+                outputLines.push(line);
                 jobManager.appendJobLog(jobId, line);
             }
         };
@@ -207,7 +218,8 @@ function runWebsiteDeployment(jobId) {
                     url: `https://${projectName.toLowerCase()}.web.app/`
                 });
             } else {
-                reject(new Error(`Website deployment exited with code ${code}`));
+                const detail = outputLines.find((line) => /ERROR:|FAILED/i.test(line));
+                reject(new Error(detail || `Website deployment exited with code ${code}`));
             }
         });
     });
@@ -279,14 +291,27 @@ function getImages(selectedPersons) {
     return filtered.map((record) => ({ ...record, thumbnailUrl: imageUrl(record) }));
 }
 
+function mergeSeriesData(baseSeries, labeledSeries) {
+    const labeledByKey = new Map(
+        labeledSeries.map((record) => [record.id || record.name, record]),
+    );
+    return baseSeries.map((record) => {
+        const labeled = labeledByKey.get(record.id || record.name);
+        return labeled ? { ...record, ...labeled } : record;
+    });
+}
+
 async function generateFeData() {
-    const series = loadSeries(LABELED_FILE);
-    if (!series.length) throw new Error('Labeled source data is missing or empty');
+    const baseSeries = loadSeries(INPUT_FILE);
+    const labeledSeries = loadSeries(LABELED_FILE);
+    if (!baseSeries.length) throw new Error(`${INPUT_FILE_NAME} is missing or empty`);
+    if (!labeledSeries.length) throw new Error(`${LABELED_FILE_NAME} is missing or empty`);
+    const series = mergeSeriesData(baseSeries, labeledSeries);
     const aliases = await ensureAliases(personIdsFromSeries(series));
     const output = `const personAliases = ${JSON.stringify(Object.fromEntries(Object.entries(aliases).map(([id, value]) => [id, value.alias || ''])), null, 2)};\n\nconst seriesData = ${JSON.stringify(series, null, 2)};\n`;
     await fs.mkdir(path.dirname(GENERATED_FILE), { recursive: true });
     await fs.writeFile(GENERATED_FILE, output, 'utf8');
-    return { file: '/FE/public/seriesData.js', persons: personIdsFromSeries(series).length, images: series.length };
+    return { file: GENERATED_FILE_URL, persons: personIdsFromSeries(series).length, images: series.length };
 }
 
 async function body(request) {
@@ -331,7 +356,7 @@ async function resetImageDataFile() {
 }
 
 function startLabelingJob(response) {
-    const totalImages = loadSeries(path.join(ROOT, 'image-links.js')).length;
+    const totalImages = loadSeries(INPUT_FILE).length;
     // reset person-aliases.json before starting labeling job
     fs.writeFile(ALIASES_FILE, JSON.stringify({}, null, 2)).catch((error) => {
         console.error(`Failed to reset ${ALIASES_FILE}: ${error.message}`);
@@ -382,6 +407,7 @@ const server = http.createServer(async (request, response) => {
             return startLabelingJob(response);
         }
         if (url.pathname === '/api/deploy-website' && request.method === 'POST') {
+            await generateFeData();
             const jobId = jobManager.createJob();
             json(response, 202, { jobId, status: 'processing', message: 'Public website deployment started' });
             startWebsiteDeployment(jobId).then((result) => {
@@ -395,14 +421,14 @@ const server = http.createServer(async (request, response) => {
         if (url.pathname === '/api/extract/google-drive' && request.method === 'POST') {
             const input = await body(request);
             if (typeof input.folderUrl !== 'string' || !input.folderUrl) throw new Error('folderUrl is required');
-            input.outputFile = 'image-links.js';
+            input.outputFile = INPUT_FILE_NAME;
             await resetImageDataFile();
             return startExtractionJob(response, googleDrive.run, input, 'google-drive');
         }
         if (url.pathname === '/api/extract/onedrive' && request.method === 'POST') {
             const input = await body(request);
             if (typeof input.folderUrl !== 'string' || !input.folderUrl) throw new Error('folderUrl is required');
-            input.outputFile = input.outputFile || 'image-links.js';
+            input.outputFile = input.outputFile || INPUT_FILE_NAME;
             await resetImageDataFile();
             return startExtractionJob(response, oneDrive.run, input, 'onedrive');
         }
@@ -413,7 +439,7 @@ const server = http.createServer(async (request, response) => {
         if (url.pathname.startsWith('/report/')) return serveFile(response, safeStaticFile(REPORT_DIRECTORY, url.pathname.slice('/report/'.length)));
         if (url.pathname === '/face-clusters-report/' || url.pathname === '/face-clusters-report') return serveFile(response, safeStaticFile(path.join(ROOT, 'face-clusters-report'), 'index.html'));
         if (url.pathname.startsWith('/face-clusters-report/')) return serveFile(response, safeStaticFile(path.join(ROOT, 'face-clusters-report'), url.pathname.slice('/face-clusters-report/'.length)));
-        if (url.pathname === '/FE/seriesData.js') return serveFile(response, GENERATED_FILE);
+        if (url.pathname === GENERATED_FILE_URL) return serveFile(response, GENERATED_FILE);
         if (url.pathname.startsWith('/FE/')) return serveFile(response, safeStaticFile(path.join(ROOT, 'FE', 'public'), url.pathname.slice(4) || 'index.html'));
         return json(response, 404, { error: 'Not found' });
     } catch (error) { json(response, 400, { error: error.message }); }

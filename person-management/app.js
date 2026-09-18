@@ -320,12 +320,11 @@ async function loadGallery() {
             galleryStatus.textContent = `Error: ${data.error || 'Failed to load gallery'}`;
             return;
         }
-
         persons = data.persons || [];
-        if (persons.length === 0) {
-            galleryStatus.textContent = 'No images available. Generate images first.';
-            return;
-        }
+        // if (persons.length === 0) {
+        //     galleryStatus.textContent = 'No images available. Generate images first.';
+        //     return;
+        // }
         personFilter.replaceChildren(new Option('All', 'all'), new Option('No Person', 'no-person'));
         persons.forEach((person) => personFilter.add(new Option(person.alias || person.id, person.id)));
         syncPersonFilterUI();
@@ -483,6 +482,11 @@ publicWebsiteBtn.addEventListener('click', async () => {
     isProcessing = true;
     publicWebsiteBtn.disabled = true;
     addLabelLog('Starting public website generation and deployment...');
+    const finishDeployment = (message = null) => {
+        if (message) addLabelLog(message);
+        publicWebsiteBtn.disabled = false;
+        isProcessing = false;
+    };
     try {
         // const generateResponse = await fetch('/api/generate-fe-data', { method: 'POST' });
         // const generated = await generateResponse.json();
@@ -503,23 +507,20 @@ publicWebsiteBtn.addEventListener('click', async () => {
             for (const message of (job.logs || []).slice(displayedLogs)) addLabelLog(message);
             displayedLogs = (job.logs || []).length;
             if (job.status === 'completed') {
-                addLabelLog(`Public Website deployed: ${job.result.url}`);
-                publicWebsiteBtn.disabled = false;
-                isProcessing = false;
+                finishDeployment(`Public Website deployed: ${job.result.url}`);
                 return;
             }
-            if (job.status === 'failed') throw new Error(job.error || 'Website deployment failed');
+            if (job.status === 'failed') {
+                finishDeployment(`ERROR: ${job.error || 'Website deployment failed'}`);
+                return;
+            }
             setTimeout(poll, 2000);
         };
         poll().catch((error) => {
-            addLabelLog(`ERROR: ${error.message}`);
-            publicWebsiteBtn.disabled = false;
-            isProcessing = false;
+            finishDeployment(`ERROR: ${error.message}`);
         });
     } catch (error) {
-        addLabelLog(`ERROR: ${error.message}`);
-        publicWebsiteBtn.disabled = false;
-        isProcessing = false;
+        finishDeployment(`ERROR: ${error.message}`);
     }
 });
 

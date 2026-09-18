@@ -1,4 +1,5 @@
 const imageCache = new Map();
+const aliases = {};
 
 const landmarkStyles = [
     { name: 'Left eye', color: '#2563eb' },
@@ -244,7 +245,7 @@ function createCluster(id, items) {
     const grid = document.createElement('div');
     const records = new Map();
 
-    heading.textContent = id;
+    heading.textContent = aliases[id] ? `${aliases[id]} (${id})` : id;
     count.textContent = ` ${items.length} face(s)`;
     heading.appendChild(count);
     grid.className = 'grid';
@@ -261,7 +262,11 @@ function createCluster(id, items) {
     return section;
 }
 
-function setupPersonFilter(groups, render) {
+function personLabel(id) {
+    return aliases[id] ? `${aliases[id]} (${id})` : id;
+}
+
+function setupPersonFilter(groups, render, onSelectionChange) {
     const select = document.getElementById('person-filter');
     const trigger = document.getElementById('person-filter-trigger');
     const label = document.getElementById('person-filter-label');
@@ -271,7 +276,7 @@ function setupPersonFilter(groups, render) {
     ids.forEach((id) => {
         const option = document.createElement('option');
         option.value = id;
-        option.textContent = id;
+        option.textContent = personLabel(id);
         option.selected = ids.indexOf(id) === 0;
         select.append(option);
     });
@@ -308,6 +313,7 @@ function setupPersonFilter(groups, render) {
                 option.selected = checkbox.checked;
                 render();
                 sync();
+                onSelectionChange?.();
             });
             text.textContent = option.textContent;
             item.append(checkbox, text);
@@ -338,11 +344,70 @@ function setupPersonFilter(groups, render) {
     };
 }
 
-function renderReport() {
+async function loadAliases() {
+    try {
+        const response = await fetch('/api/person-aliases');
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load aliases');
+        Object.entries(data).forEach(([id, value]) => {
+            aliases[id] = typeof value === 'string' ? value : value?.alias || '';
+        });
+    } catch (error) {
+        console.warn('Could not load aliases:', error.message);
+    }
+}
+
+function setupAliasEditor(personFilter, render) {
+    const select = document.getElementById('person-filter');
+    const input = document.getElementById('alias-input');
+    const button = document.getElementById('update-alias-btn');
+    const status = document.getElementById('alias-status');
+
+    const sync = () => {
+        const selected = [...personFilter.getSelected()];
+        const enabled = selected.length === 1;
+        input.disabled = !enabled;
+        button.disabled = !enabled;
+        input.value = enabled ? aliases[selected[0]] || '' : '';
+        status.textContent = enabled ? '' : 'Select one person';
+    };
+
+    button.addEventListener('click', async () => {
+        const selected = [...personFilter.getSelected()];
+        if (selected.length !== 1) return;
+        const id = selected[0];
+        button.disabled = true;
+        status.textContent = 'Saving...';
+        try {
+            const response = await fetch('/api/person-aliases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [id]: input.value }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Could not update alias');
+            aliases[id] = input.value.trim();
+            const option = [...select.options].find((item) => item.value === id);
+            if (option) option.textContent = personLabel(id);
+            personFilter.sync();
+            render();
+            status.textContent = 'Saved';
+        } catch (error) {
+            status.textContent = `Error: ${error.message}`;
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    return sync;
+}
+
+async function renderReport() {
     const clusters = document.getElementById('clusters');
     const status = document.getElementById('report-status');
     const groups = buildGroups();
     let personFilter;
+    let syncAliasEditor = () => {};
 
     // document.getElementById('report').insertBefore(
     //     createLandmarkLegend(),
@@ -363,8 +428,11 @@ function renderReport() {
             : 'No matching people.';
     };
 
-    personFilter = setupPersonFilter(groups, render);
+    await loadAliases();
+    personFilter = setupPersonFilter(groups, render, () => syncAliasEditor());
+    syncAliasEditor = setupAliasEditor(personFilter, render);
     personFilter.sync();
+    syncAliasEditor();
     render();
 }
 
